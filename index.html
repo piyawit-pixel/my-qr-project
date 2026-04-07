@@ -3,76 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Scanner for Hospital Tracking</title>
+    <title>SUT Hospital - QR Scanner</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #121212; color: white; }
-        #reader { width: 100%; max-width: 500px; margin: 20px auto; border: 2px solid #00d4ff; border-radius: 15px; overflow: hidden; box-shadow: 0 0 20px rgba(0, 212, 255, 0.2); }
-        #status { margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: bold; transition: 0.3s; }
-        .waiting { background: #333; color: #aaa; }
-        .success { background: #00c853; color: white; }
-        .error { background: #ff1744; color: white; }
-        .btn-restart { margin-top: 20px; padding: 10px 20px; background: #00d4ff; border: none; border-radius: 5px; cursor: pointer; display: none; }
+        body { font-family: 'Kanit', sans-serif; text-align: center; padding: 20px; background: #f5f7fa; color: #2c3e50; }
+        #reader { width: 100%; max-width: 500px; margin: 20px auto; border: 4px solid #E65100; border-radius: 15px; overflow: hidden; background: white; }
+        #status { margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: bold; }
+        .success { background: #E65100; color: white; }
+        .waiting { background: #eee; color: #666; }
+        h1 { color: #E65100; }
     </style>
 </head>
 <body>
-    <h1>🚀 ระบบสแกนขนส่ง</h1>
+    <h1>🏥 SUT Hospital Scanner</h1>
     <div id="reader"></div>
-    <div id="status" class="waiting">🔄 กำลังเชื่อมต่อกับ HiveMQ...</div>
-    <button id="restartBtn" class="btn-restart" onclick="location.reload()">เริ่มสแกนใหม่</button>
+    <div id="status" class="waiting">🔄 กำลังเชื่อมต่อระบบ...</div>
+    <button id="restartBtn" style="display:none; margin-top:20px; padding:12px 24px; background:#FFB300; border:none; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="location.reload()">สแกนจุดต่อไป</button>
 
     <script>
-        // 1. ตั้งค่าการเชื่อมต่อ HiveMQ
-        const host = '5c43f9d08b6f48a9a160fe907db23534.s1.eu.hivemq.cloud';
-        const port = 8884;
-        const options = {
+        const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbyYFikookLUj_a-dNZPmGbwLRGU8Xee5j5Ipw5ZTGkr1J72hstqRxRsLrBla-zpMGY/exec";
+        
+        // 1. เชื่อมต่อ HiveMQ
+        const client = mqtt.connect('wss://5c43f9d08b6f48a9a160fe907db23534.s1.eu.hivemq.cloud:8884/mqtt', {
             username: 'pizza_user',
-            password: 'Password123',
-            protocol: 'wss',
-            path: '/mqtt'
-        };
+            password: 'Password123'
+        });
 
-        const client = mqtt.connect(`wss://${host}:${port}/mqtt`, options);
         let isConnected = false;
-
         client.on('connect', () => {
             isConnected = true;
-            document.getElementById('status').innerText = "✅ เชื่อมต่อสำเร็จ! พร้อมสแกน QR Code";
-            document.getElementById('status').className = "success";
+            document.getElementById('status').innerText = "✅ พร้อมสแกนจุดรับ-ส่งของ";
         });
 
-        client.on('error', (err) => {
-            document.getElementById('status').innerText = "❌ เชื่อมต่อล้มเหลว: " + err.message;
-            document.getElementById('status').className = "error";
-        });
-
-        // 2. ฟังก์ชันเมื่อสแกนสำเร็จ
+        // 2. ฟังก์ชันเมื่อสแกนติด
         function onScanSuccess(decodedText) {
             if (isConnected) {
-                // ส่งข้อมูลไปที่ HiveMQ
-                client.publish('hospital/track', decodedText, { qos: 1 }, (err) => {
-                    if (!err) {
-                        document.getElementById('status').innerText = "📤 ส่งข้อมูลสำเร็จ: " + decodedText;
-                        document.getElementById('status').className = "success";
-                        
-                        // หยุดกล้องและโชว์ปุ่มเริ่มใหม่
-                        html5QrcodeScanner.clear();
-                        document.getElementById('restartBtn').style.display = 'inline-block';
-                        
-                        // สั่นเตือน (ถ้ามือถือรองรับ)
-                        if (navigator.vibrate) navigator.vibrate(200);
-                    }
+                // ส่งไป HiveMQ (Real-time)
+                client.publish('hospital/track', decodedText, { qos: 1 });
+
+                // ส่งไป Google Sheets (บันทึกประวัติ)
+                fetch(GOOGLE_SHEET_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: decodedText
+                }).then(() => {
+                    document.getElementById('status').innerText = "📤 บันทึกข้อมูลสำเร็จ!";
+                    document.getElementById('status').className = "success";
+                    html5QrcodeScanner.clear();
+                    document.getElementById('restartBtn').style.display = 'inline-block';
+                    if (navigator.vibrate) navigator.vibrate(200);
                 });
             }
         }
 
-        // 3. เริ่มต้นเครื่องสแกน
-        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-            fps: 10, 
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0
-        });
+        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
         html5QrcodeScanner.render(onScanSuccess);
     </script>
 </body>
