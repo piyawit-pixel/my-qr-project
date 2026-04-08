@@ -45,41 +45,41 @@
 
         // ฟังก์ชันเมื่อสแกนสำเร็จ
         function onScanSuccess(decodedText) {
-        statusBox.innerText = "⌛ กำลังบันทึกข้อมูล (มทส.)...";
+            statusBox.innerText = "⌛ กำลังบันทึกข้อมูล (มทส.)...";
     
-        // 1. ส่ง HiveMQ (ตัวเดิมที่ทำงานได้อยู่แล้ว)
-        client.publish('hospital/track', decodedText, { qos: 1 });
+            // 1. ส่ง HiveMQ (ตัวเดิมที่ทำงานได้อยู่แล้ว)
+            client.publish('hospital/track', decodedText, { qos: 1 });
 
-        // 2. แยกข้อมูลจาก JSON
-        try {
-            const data = JSON.parse(decodedText);
+            // 2. แยกข้อมูลจาก JSON
+            try {
+                const data = JSON.parse(decodedText);
         
-            // 3. ส่งไป Google Sheets ด้วยการสร้าง <img> (วิธีไม้ตาย)
-                const img = new Image();
-                const finalUrl = `${GOOGLE_URL}?n=${encodeURIComponent(data.name)}&la=${data.lat}&lo=${data.lng}&t=${new Date().getTime()}`;
+                // 3. ส่งไป Google Sheets ด้วยการสร้าง <img> (วิธีไม้ตาย)
+                    const img = new Image();
+                    const finalUrl = `${GOOGLE_URL}?n=${encodeURIComponent(data.name)}&la=${data.lat}&lo=${data.lng}&t=${new Date().getTime()}`;
         
-            img.onload = function() {
-                statusBox.innerText = "🚀 บันทึกสำเร็จ (SUT Hospital)";
-                statusBox.className = "success";
-                reloadBtn.style.display = "block";
-                html5QrcodeScanner.clear();
-            };
+                img.onload = function() {
+                    statusBox.innerText = "🚀 บันทึกสำเร็จ (SUT Hospital)";
+                    statusBox.className = "success";
+                    reloadBtn.style.display = "block";
+                    html5QrcodeScanner.clear();
+                };
         
-            img.onerror = function() {
-                // ถึงจะ Error แต่ถ้าข้อมูลใน URL ถูกต้อง Google Sheet จะบันทึกไปแล้ว
-                statusBox.innerText = "🚀 บันทึกเรียบร้อย!";
-                statusBox.className = "success";
-                reloadBtn.style.display = "block";
-                html5QrcodeScanner.clear();
-            };
+                img.onerror = function() {
+                    // ถึงจะ Error แต่ถ้าข้อมูลใน URL ถูกต้อง Google Sheet จะบันทึกไปแล้ว
+                    statusBox.innerText = "🚀 บันทึกเรียบร้อย!";
+                    statusBox.className = "success";
+                    reloadBtn.style.display = "block";
+                    html5QrcodeScanner.clear();
+                };
 
-            img.src = finalUrl; // เริ่มส่งข้อมูลทันทีที่กำหนด src
+                img.src = finalUrl; // เริ่มส่งข้อมูลทันทีที่กำหนด src
 
-        } catch (e) {
-            statusBox.innerText = "❌ รูปแบบ QR ไม่ถูกต้อง";
-            statusBox.className = "error";
+            } catch (e) {
+                statusBox.innerText = "❌ รูปแบบ QR ไม่ถูกต้อง";
+                statusBox.className = "error";
+            }
         }
-    }
 
         // ตั้งค่ากล้อง
         const html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
