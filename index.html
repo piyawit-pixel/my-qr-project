@@ -28,7 +28,7 @@
 
     <script>
         // *** ใส่ URL ของคุณตรงนี้ ***
-        const GOOGLE_URL = "https://script.google.com/macros/s/AKfycbyYFikookLUj_a-dNZPmGbwLRGU8Xee5j5Ipw5ZTGkr1J72hstqRxRsLrBla-zpMGY/exec";
+        const GOOGLE_URL = "https://script.google.com/macros/s/AKfycbzgBQsZb3fO_d1QE-ztluNh6gwXDz72aNHNUWcZnTyrO6J1jjsI9LT7nQ7FgedA0tA/exec";
         
         // เชื่อมต่อ HiveMQ (Real-time)
         const client = mqtt.connect('wss://5c43f9d08b6f48a9a160fe907db23534.s1.eu.hivemq.cloud:8884/mqtt', {
@@ -46,32 +46,24 @@
         // ฟังก์ชันเมื่อสแกนสำเร็จ
         function onScanSuccess(decodedText) {
             statusBox.innerText = "⌛ กำลังบันทึกข้อมูล...";
-            
-            // 1. ส่งเข้า HiveMQ ทันที
+    
+            // 1. ส่งเข้า HiveMQ (Real-time) - อันนี้ทำงานอยู่แล้ว
             client.publish('hospital/track', decodedText, { qos: 1 });
 
-            // 2. ส่งเข้า Google Sheets (ใช้ Fetch แบบที่ iPhone ชอบ)
-            fetch(GOOGLE_URL, {
-                method: 'POST',
-                mode: 'no-cors', // สำคัญมาก: เพื่อข้ามปัญหา CORS บนมือถือ
-                cache: 'no-cache',
-                headers: { 'Content-Type': 'application/json' },
-                body: decodedText // ส่งก้อน JSON ตรงๆ ไปเลย
-            })
+            // 2. แปลง JSON จาก QR เป็น Parameter
+            const data = JSON.parse(decodedText);
+            const saveUrl = `${GOOGLE_URL}?name=${encodeURIComponent(data.name)}&lat=${data.lat}&lng=${data.lng}`;
+
+            // 3. ส่งแบบ GET (ซึ่งเสถียรกว่ามากบน iPhone)
+            fetch(saveUrl, { mode: 'no-cors' })
             .then(() => {
-                // สำหรับ mode 'no-cors' เราจะไม่เห็น response แต่ถ้าไม่มี Error คือส่งผ่าน
-                statusBox.innerText = "🚀 บันทึกข้อมูลเรียบร้อย!";
+                statusBox.innerText = "🚀 บันทึกข้อมูลเรียบร้อย (SUT Hospital)";
                 statusBox.className = "success";
                 reloadBtn.style.display = "block";
-                
-                // สั่นเครื่องเพื่อแจ้งเตือน (ถ้ามือถือรองรับ)
-                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                
-                // ปิดกล้องเพื่อประหยัดแบต
                 html5QrcodeScanner.clear();
             })
             .catch(err => {
-                statusBox.innerText = "❌ ส่งข้อมูลไม่สำเร็จ: " + err;
+                statusBox.innerText = "❌ ส่งไม่สำเร็จ: " + err;
                 statusBox.className = "error";
             });
         }
