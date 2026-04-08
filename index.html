@@ -45,50 +45,43 @@
 
         // ฟังก์ชันเมื่อสแกนสำเร็จ
         function onScanSuccess(decodedText) {
-            statusBox.innerText = "⌛ กำลังตรวจสอบข้อมูล (SUT Hospital)...";
-            console.log("ข้อมูลที่สแกนได้:", decodedText);
+            statusBox.innerText = "⌛ กำลังถอดรหัสและบันทึก...";
 
-            // 1. ส่งเข้า HiveMQ (Real-time) - ส่งค่าดิบไปก่อนเพื่อให้แผนที่ขยับถ้าเป็นไปได้
+            // 1. ส่งเข้า HiveMQ (Real-time)
             client.publish('hospital/track', decodedText, { qos: 1 });
 
-            let finalName = "";
-            let finalLat = "0";
-            let finalLng = "0";
+            let finalName, finalLat, finalLng;
 
             try {
-                // พยายามอ่านแบบ JSON (มาตรฐาน)
-                const data = JSON.parse(decodedText);
-                finalName = data.name || "ไม่ระบุชื่อ";
-                finalLat = data.lat || "0";
-                finalLng = data.lng || "0";
+                // *** จุดสำคัญ: ต้องใช้ decodeURIComponent ก่อน ***
+                const cleanText = decodeURIComponent(decodedText); 
+                console.log("ถอดรหัสแล้ว:", cleanText);
+
+                // ค่อยเอามา Parse เป็น JSON
+                const data = JSON.parse(cleanText);
+                finalName = data.name;
+                finalLat = data.lat;
+                finalLng = data.lng;
+
             } catch (e) {
-                // ถ้ารหัส QR ไม่ใช่ JSON หรือรูปแบบเพี้ยน
-                // ให้ส่งข้อความทั้งหมดไปเก็บในช่อง 'ชื่อสถานที่' ใน Google Sheets เพื่อ Debug
-                finalName = "⚠️ รูปแบบผิด: " + decodedText;
+                // ถ้าถอดรหัสแล้วยังไม่ใช่ JSON ให้ส่งค่าดิบไป (แบบถอดรหัสแล้ว)
+                finalName = "RAW_" + decodeURIComponent(decodedText);
                 finalLat = "0";
                 finalLng = "0";
             }
 
-            // 2. ส่งไป Google Sheets ด้วยเทคนิค Image URL (ข้ามปัญหา CORS 100%)
+            // 2. ส่งไป Google Sheets (วิธี Image เหมือนเดิมที่เวิร์กแล้ว)
             const img = new Image();
-            // สร้าง URL พร้อม Timestamp ป้องกัน Cache
-            const saveUrl = `${GOOGLE_URL}?n=${encodeURIComponent(finalName)}&la=${finalLat}&lo=${finalLng}&t=${Date.now()}`;
+            const url = `${GOOGLE_URL}?n=${encodeURIComponent(finalName)}&la=${finalLat}&lo=${finalLng}&t=${Date.now()}`;
     
             img.onload = img.onerror = function() {
-                // ไม่ว่ารูปจะโหลดขึ้นหรือไม่ (เพราะ Google ส่ง Text กลับมา) 
-                // แต่การเรียกลิงก์นี้จะทำให้ Google Sheet บันทึกข้อมูลไปแล้ว
-                statusBox.innerText = "🚀 บันทึกเรียบร้อย! (ตรวจสอบใน Sheet)";
+                statusBox.innerText = "🚀 บันทึกเรียบร้อย! (SUT Hospital)";
                 statusBox.className = "success";
                 document.getElementById('reloadBtn').style.display = "block";
-        
-                // สั่นแจ้งเตือน และปิดกล้อง
-                if (navigator.vibrate) navigator.vibrate(200);
                 html5QrcodeScanner.clear();
             };
-
-            img.src = saveUrl; // เริ่มต้นการส่งข้อมูล
+            img.src = url;
         }
-
         // ตั้งค่ากล้อง
         const html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
             fps: 15, 
