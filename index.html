@@ -43,57 +43,44 @@
             statusBox.innerText = "✅ ระบบพร้อมสแกน (รพ.มทส.)";
         });
 
-        // ฟังก์ชันเมื่อสแกนสำเร็จ
+        // 1. เพิ่มตัวแปรไว้ด้านบนสุด (นอกฟังก์ชัน)
+        let isProcessing = false; 
+
         function onScanSuccess(decodedText) {
-            statusBox.innerText = "⌛ กำลังถอดรหัสข้อมูล...";
+            // 2. เช็คว่าถ้ากำลังทำงานอยู่ ให้หยุด (Return) ไม่ต้องทำต่อ
+            if (isProcessing) return; 
     
-            // 1. ส่งเข้า HiveMQ (Real-time)
+            // 3. เริ่มล็อคระบบ
+            isProcessing = true; 
+            statusBox.innerText = "⌛ กำลังบันทึกข้อมูล...";
+
+            // --- ส่วนการส่งข้อมูลเดิมของคุณ ---
             client.publish('hospital/track', decodedText, { qos: 1 });
 
-            let finalName = "";
-            let finalLat = "0";
-            let finalLng = "0";
-
             try {
-                // --- ขั้นตอนการถอดรหัสแบบพิเศษ ---
-                let cleanText = decodedText;
-        
-                // ถอดรหัสซ้ำ 2 รอบเผื่อโดน Encode ซ้อน (เช่น %2522)
-                cleanText = decodeURIComponent(decodeURIComponent(cleanText));
-        
-                // กำจัดช่องว่างหรืออักขระแปลกๆ ที่อาจติดมาหัว/ท้าย
-                cleanText = cleanText.trim();
-
-                // พยายาม Parse เป็น JSON
+                let cleanText = decodeURIComponent(decodeURIComponent(decodedText)).trim();
                 const data = JSON.parse(cleanText);
-                finalName = data.name || "ไม่ระบุชื่อ";
-                finalLat = data.lat || "0";
-                finalLng = data.lng || "0";
+        
+                const img = new Image();
+                const url = `${GOOGLE_URL}?n=${encodeURIComponent(data.name)}&la=${data.lat}&lo=${data.lng}&t=${Date.now()}`;
+        
+                img.onload = img.onerror = function() {
+                    statusBox.innerText = "🚀 บันทึกเรียบร้อย!";
+                    statusBox.className = "success";
+                    document.getElementById('reloadBtn').style.display = "block";
+            
+                    // หยุดการสแกนไปเลยเพื่อให้มั่นใจว่าไม่มาซ้ำ
+                    html5QrcodeScanner.clear(); 
+            
+                    // ปลดล็อคหลังจาก 3 วินาที (ป้องกันการกดเบิ้ล)
+                    setTimeout(() => { isProcessing = false; }, 3000);
+                };
+                img.src = url;
 
             } catch (e) {
-                // ถ้า Parse ไม่ได้จริงๆ ให้ถอดรหัสเป็นข้อความธรรมดาแล้วส่งไปดูใน Sheet
-                try {
-                    finalName = "ถอดรหัสแล้ว: " + decodeURIComponent(decodedText);
-                } catch(err) {
-                    finalName = "ค่าดิบ: " + decodedText;
-                }
-                finalLat = "ERR";
-                finalLng = "ERR";
+                console.error(e);
+                isProcessing = false; // ถ้า Error ต้องปลดล็อคให้สแกนใหม่ได้
             }
-
-            // 2. ส่งไป Google Sheets (วิธี Image ที่ทำงานได้ชัวร์)
-            const img = new Image();
-            const saveUrl = `${GOOGLE_URL}?n=${encodeURIComponent(finalName)}&la=${finalLat}&lo=${finalLng}&t=${Date.now()}`;
-    
-            img.onload = img.onerror = function() {
-                statusBox.innerText = "🚀 บันทึกเรียบร้อย!";
-                statusBox.className = "success";
-                document.getElementById('reloadBtn').style.display = "block";
-                if (navigator.vibrate) navigator.vibrate(200);
-                html5QrcodeScanner.clear();
-            };    
-
-            img.src = saveUrl;
         }
         // ตั้งค่ากล้อง
         const html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
