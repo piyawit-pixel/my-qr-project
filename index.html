@@ -45,42 +45,55 @@
 
         // ฟังก์ชันเมื่อสแกนสำเร็จ
         function onScanSuccess(decodedText) {
-            statusBox.innerText = "⌛ กำลังถอดรหัสและบันทึก...";
-
+            statusBox.innerText = "⌛ กำลังถอดรหัสข้อมูล...";
+    
             // 1. ส่งเข้า HiveMQ (Real-time)
             client.publish('hospital/track', decodedText, { qos: 1 });
 
-            let finalName, finalLat, finalLng;
+            let finalName = "";
+            let finalLat = "0";
+            let finalLng = "0";
 
             try {
-                // *** จุดสำคัญ: ต้องใช้ decodeURIComponent ก่อน ***
-                const cleanText = decodeURIComponent(decodedText); 
-                console.log("ถอดรหัสแล้ว:", cleanText);
+                // --- ขั้นตอนการถอดรหัสแบบพิเศษ ---
+                let cleanText = decodedText;
+        
+                // ถอดรหัสซ้ำ 2 รอบเผื่อโดน Encode ซ้อน (เช่น %2522)
+                cleanText = decodeURIComponent(decodeURIComponent(cleanText));
+        
+                // กำจัดช่องว่างหรืออักขระแปลกๆ ที่อาจติดมาหัว/ท้าย
+                cleanText = cleanText.trim();
 
-                // ค่อยเอามา Parse เป็น JSON
+                // พยายาม Parse เป็น JSON
                 const data = JSON.parse(cleanText);
-                finalName = data.name;
-                finalLat = data.lat;
-                finalLng = data.lng;
+                finalName = data.name || "ไม่ระบุชื่อ";
+                finalLat = data.lat || "0";
+                finalLng = data.lng || "0";
 
             } catch (e) {
-                // ถ้าถอดรหัสแล้วยังไม่ใช่ JSON ให้ส่งค่าดิบไป (แบบถอดรหัสแล้ว)
-                finalName = "RAW_" + decodeURIComponent(decodedText);
-                finalLat = "0";
-                finalLng = "0";
+                // ถ้า Parse ไม่ได้จริงๆ ให้ถอดรหัสเป็นข้อความธรรมดาแล้วส่งไปดูใน Sheet
+                try {
+                    finalName = "ถอดรหัสแล้ว: " + decodeURIComponent(decodedText);
+                } catch(err) {
+                    finalName = "ค่าดิบ: " + decodedText;
+                }
+                finalLat = "ERR";
+                finalLng = "ERR";
             }
 
-            // 2. ส่งไป Google Sheets (วิธี Image เหมือนเดิมที่เวิร์กแล้ว)
+            // 2. ส่งไป Google Sheets (วิธี Image ที่ทำงานได้ชัวร์)
             const img = new Image();
-            const url = `${GOOGLE_URL}?n=${encodeURIComponent(finalName)}&la=${finalLat}&lo=${finalLng}&t=${Date.now()}`;
+            const saveUrl = `${GOOGLE_URL}?n=${encodeURIComponent(finalName)}&la=${finalLat}&lo=${finalLng}&t=${Date.now()}`;
     
             img.onload = img.onerror = function() {
-                statusBox.innerText = "🚀 บันทึกเรียบร้อย! (SUT Hospital)";
+                statusBox.innerText = "🚀 บันทึกเรียบร้อย!";
                 statusBox.className = "success";
                 document.getElementById('reloadBtn').style.display = "block";
+                if (navigator.vibrate) navigator.vibrate(200);
                 html5QrcodeScanner.clear();
-            };
-            img.src = url;
+            };    
+
+            img.src = saveUrl;
         }
         // ตั้งค่ากล้อง
         const html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
