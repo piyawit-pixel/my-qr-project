@@ -44,15 +44,20 @@
         });
 
         // 1. เพิ่มตัวแปรไว้ด้านบนสุด (นอกฟังก์ชัน)
-        let isProcessing = false; 
+        let isProcessing = false; // ตัวล็อคระดับ Global
 
         function onScanSuccess(decodedText) {
-            // 2. เช็คว่าถ้ากำลังทำงานอยู่ ให้หยุด (Return) ไม่ต้องทำต่อ
+            // 1. ล็อคทันที! ถ้ากำลังทำงานอยู่ให้ดีดออกเลย
             if (isProcessing) return; 
-    
-            // 3. เริ่มล็อคระบบ
             isProcessing = true; 
-            statusBox.innerText = "⌛ กำลังบันทึกข้อมูล...";
+
+            // 2. ปิดกล้องทันที! (นี่คือท่าไม้ตายหยุดการสแกนซ้ำ)
+            html5QrcodeScanner.clear().then(() => {
+                console.log("ปิดกล้องเรียบร้อย เพื่อป้องกันการสแกนซ้ำ");
+            }).catch(err => console.error("ปิดกล้องไม่สำเร็จ", err));
+
+            statusBox.innerText = "⌛ กำลังบันทึกข้อมูล (มทส.)...";
+            statusBox.className = "waiting";
 
             // --- ส่วนการส่งข้อมูลเดิมของคุณ ---
             client.publish('hospital/track', decodedText, { qos: 1 });
@@ -62,24 +67,25 @@
                 const data = JSON.parse(cleanText);
         
                 const img = new Image();
+                // ใส่ Timestamp ละเอียดระดับมิลลิวินาทีป้องกัน Cache
                 const url = `${GOOGLE_URL}?n=${encodeURIComponent(data.name)}&la=${data.lat}&lo=${data.lng}&t=${Date.now()}`;
         
                 img.onload = img.onerror = function() {
-                    statusBox.innerText = "🚀 บันทึกเรียบร้อย!";
+                    statusBox.innerText = "🚀 บันทึกเรียบร้อย! (1 รายการ)";
                     statusBox.className = "success";
                     document.getElementById('reloadBtn').style.display = "block";
             
-                    // หยุดการสแกนไปเลยเพื่อให้มั่นใจว่าไม่มาซ้ำ
-                    html5QrcodeScanner.clear(); 
-            
-                    // ปลดล็อคหลังจาก 3 วินาที (ป้องกันการกดเบิ้ล)
+                    // ปลดล็อคหลังจาก 3 วินาที เผื่อเจ้าหน้าที่จะกดสแกนใหม่
                     setTimeout(() => { isProcessing = false; }, 3000);
                 };
                 img.src = url;
 
             } catch (e) {
-                console.error(e);
-                isProcessing = false; // ถ้า Error ต้องปลดล็อคให้สแกนใหม่ได้
+                console.error("JSON Error:", e);
+                statusBox.innerText = "❌ รูปแบบ QR ไม่ถูกต้อง";
+                isProcessing = false;
+                // ถ้า Error ให้เปิดกล้องใหม่เผื่อสแกนซ่อม
+                location.reload(); 
             }
         }
         // ตั้งค่ากล้อง
