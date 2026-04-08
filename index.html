@@ -4,33 +4,155 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SUT Hospital - QR Scanner</title>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <style>
-        :root { --sut-orange: #E65100; --sut-gold: #FFB300; --bg: #F5F7FA; }
-        body { font-family: 'Kanit', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        h1 { color: var(--sut-orange); font-size: 24px; margin-bottom: 10px; }
-        #reader { width: 100%; max-width: 400px; border: 5px solid var(--sut-orange); border-radius: 20px; overflow: hidden; background: white; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-        #status-box { width: 100%; max-width: 370px; margin-top: 20px; padding: 20px; border-radius: 15px; text-align: center; font-weight: 500; transition: all 0.3s; background: white; border: 1px solid #ddd; }
-        .success { background: #4CAF50 !important; color: white; border: none !important; }
-        .error { background: #f44336 !important; color: white; border: none !important; }
-        .btn-reload { margin-top: 15px; padding: 12px 30px; background: var(--sut-gold); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; display: none; }
+        :root { 
+            --sut-orange: #E65100; 
+            --sut-gold: #FFB300; 
+            --bg: #F0F2F5; 
+            --success: #2E7D32;
+            --error: #C62828;
+        }
+
+        body { 
+            font-family: 'Kanit', sans-serif; 
+            background: var(--bg); 
+            margin: 0; 
+            padding: 0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            min-height: 100vh;
+        }
+
+        /* ส่วนหัวแอป */
+        .app-header {
+            width: 100%;
+            background: white;
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+        }
+
+        .app-header h1 { 
+            color: var(--sut-orange); 
+            font-size: 20px; 
+            margin: 0; 
+            font-weight: 600;
+        }
+
+        /* กรอบกล้องสแกน */
+        .scanner-card {
+            width: 90%;
+            max-width: 400px;
+            background: white;
+            padding: 12px;
+            border-radius: 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        #reader { 
+            width: 100%; 
+            border: none !important; 
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        /* ปรับแต่งปุ่มภายในกล้อง */
+        #reader button {
+            background-color: var(--sut-orange) !important;
+            border: none !important;
+            border-radius: 8px !important;
+            color: white !important;
+            padding: 10px 18px !important;
+            font-family: 'Kanit' !important;
+            font-size: 14px !important;
+            margin: 10px 0 !important;
+            cursor: pointer;
+        }
+
+        /* กล่องแสดงสถานะ */
+        #status-box { 
+            width: 85%; 
+            max-width: 360px; 
+            margin-top: 25px; 
+            padding: 20px; 
+            border-radius: 20px; 
+            text-align: center; 
+            font-weight: 500; 
+            background: white; 
+            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            color: #555;
+        }
+
+        /* คลาสสถานะสำหรับการแสดงผล */
+        .waiting { border-left: 6px solid var(--sut-gold); }
+        .success { 
+            background: #E8F5E9 !important; 
+            color: var(--success) !important; 
+            border: 2px solid var(--success) !important;
+            transform: scale(1.02);
+        }
+        .error { 
+            background: #FFEBEE !important; 
+            color: var(--error) !important; 
+            border: 2px solid var(--error) !important;
+        }
+
+        /* ปุ่มโหลดหน้าใหม่ */
+        .btn-reload { 
+            margin-top: 20px; 
+            width: 85%;
+            max-width: 360px;
+            padding: 16px; 
+            background: linear-gradient(135deg, var(--sut-gold), #FFA000); 
+            border: none; 
+            border-radius: 16px; 
+            color: #333;
+            font-weight: 600; 
+            font-size: 16px;
+            cursor: pointer; 
+            display: none; 
+            box-shadow: 0 8px 20px rgba(255, 179, 0, 0.3);
+            font-family: 'Kanit';
+            transition: transform 0.2s;
+        }
+
+        .btn-reload:active { transform: scale(0.96); }
+
+        .footer {
+            margin-top: auto;
+            padding: 20px;
+            color: #999;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
 
-    <h1>🏥 SUT Hospital Asset</h1>
-    <div id="reader"></div>
+    <div class="app-header">
+        <h1>🏥 SUT Hospital Asset Tracking</h1>
+    </div>
+
+    <div class="scanner-card">
+        <div id="reader"></div>
+    </div>
     
     <div id="status-box">🔄 กำลังเชื่อมต่อระบบติดตาม...</div>
+    
     <button id="reloadBtn" class="btn-reload" onclick="location.reload()">สแกนจุดถัดไป</button>
 
+    <div class="footer">Suranaree University of Technology Hospital</div>
+
     <script>
-        // *** ใส่ URL ของคุณตรงนี้ ***
         const GOOGLE_URL = "https://script.google.com/macros/s/AKfycbzgBQsZb3fO_d1QE-ztluNh6gwXDz72aNHNUWcZnTyrO6J1jjsI9LT7nQ7FgedA0tA/exec";
         
-        // เชื่อมต่อ HiveMQ (Real-time)
         const client = mqtt.connect('wss://5c43f9d08b6f48a9a160fe907db23534.s1.eu.hivemq.cloud:8884/mqtt', {
             username: 'pizza_user',
             password: 'Password123'
@@ -40,26 +162,22 @@
         const reloadBtn = document.getElementById('reloadBtn');
 
         client.on('connect', () => {
-            statusBox.innerText = "✅ ระบบพร้อมสแกน (รพ.มทส.)";
+            statusBox.innerText = "✅ ระบบพร้อมสแกน (มทส.)";
         });
 
-        // 1. เพิ่มตัวแปรไว้ด้านบนสุด (นอกฟังก์ชัน)
-        let isProcessing = false; // ตัวล็อคระดับ Global
+        let isProcessing = false;
 
         function onScanSuccess(decodedText) {
-            // 1. ล็อคทันที! ถ้ากำลังทำงานอยู่ให้ดีดออกเลย
             if (isProcessing) return; 
             isProcessing = true; 
 
-            // 2. ปิดกล้องทันที! (นี่คือท่าไม้ตายหยุดการสแกนซ้ำ)
             html5QrcodeScanner.clear().then(() => {
-                console.log("ปิดกล้องเรียบร้อย เพื่อป้องกันการสแกนซ้ำ");
-            }).catch(err => console.error("ปิดกล้องไม่สำเร็จ", err));
+                console.log("Scanner Paused");
+            }).catch(err => console.error(err));
 
             statusBox.innerText = "⌛ กำลังบันทึกข้อมูล (มทส.)...";
             statusBox.className = "waiting";
 
-            // --- ส่วนการส่งข้อมูลเดิมของคุณ ---
             client.publish('hospital/track', decodedText, { qos: 1 });
 
             try {
@@ -67,15 +185,12 @@
                 const data = JSON.parse(cleanText);
         
                 const img = new Image();
-                // ใส่ Timestamp ละเอียดระดับมิลลิวินาทีป้องกัน Cache
                 const url = `${GOOGLE_URL}?n=${encodeURIComponent(data.name)}&la=${data.lat}&lo=${data.lng}&t=${Date.now()}`;
         
                 img.onload = img.onerror = function() {
-                    statusBox.innerText = "🚀 บันทึกเรียบร้อย! (1 รายการ)";
+                    statusBox.innerText = "🚀 บันทึกเรียบร้อย: " + data.name;
                     statusBox.className = "success";
                     document.getElementById('reloadBtn').style.display = "block";
-            
-                    // ปลดล็อคหลังจาก 3 วินาที เผื่อเจ้าหน้าที่จะกดสแกนใหม่
                     setTimeout(() => { isProcessing = false; }, 3000);
                 };
                 img.src = url;
@@ -83,14 +198,15 @@
             } catch (e) {
                 console.error("JSON Error:", e);
                 statusBox.innerText = "❌ รูปแบบ QR ไม่ถูกต้อง";
+                statusBox.className = "error";
                 isProcessing = false;
-                // ถ้า Error ให้เปิดกล้องใหม่เผื่อสแกนซ่อม
-                location.reload(); 
+                document.getElementById('reloadBtn').style.display = "block";
+                document.getElementById('reloadBtn').innerText = "ลองใหม่อีกครั้ง";
             }
         }
-        // ตั้งค่ากล้อง
+
         const html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-            fps: 15, 
+            fps: 20, 
             qrbox: { width: 250, height: 250 },
             aspectRatio: 1.0
         });
