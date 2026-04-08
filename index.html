@@ -45,40 +45,40 @@
 
         // ฟังก์ชันเมื่อสแกนสำเร็จ
         function onScanSuccess(decodedText) {
-            statusBox.innerText = "⌛ กำลังบันทึกข้อมูล (มทส.)...";
-    
-            // 1. ส่ง HiveMQ (ตัวเดิมที่ทำงานได้อยู่แล้ว)
+            statusBox.innerText = "⌛ กำลังตรวจสอบข้อมูล...";
+            console.log("Scanned Data:", decodedText);
+
+            // 1. ส่งเข้า HiveMQ (Real-time) - ส่งค่าดิบไปก่อนเลย
             client.publish('hospital/track', decodedText, { qos: 1 });
 
-            // 2. แยกข้อมูลจาก JSON
+            let finalName, finalLat, finalLng;
+
             try {
+                // พยายามอ่านแบบ JSON
                 const data = JSON.parse(decodedText);
-        
-                // 3. ส่งไป Google Sheets ด้วยการสร้าง <img> (วิธีไม้ตาย)
-                    const img = new Image();
-                    const finalUrl = `${GOOGLE_URL}?n=${encodeURIComponent(data.name)}&la=${data.lat}&lo=${data.lng}&t=${new Date().getTime()}`;
-        
-                img.onload = function() {
-                    statusBox.innerText = "🚀 บันทึกสำเร็จ (SUT Hospital)";
-                    statusBox.className = "success";
-                    reloadBtn.style.display = "block";
-                    html5QrcodeScanner.clear();
-                };
-        
-                img.onerror = function() {
-                    // ถึงจะ Error แต่ถ้าข้อมูลใน URL ถูกต้อง Google Sheet จะบันทึกไปแล้ว
-                    statusBox.innerText = "🚀 บันทึกเรียบร้อย!";
-                    statusBox.className = "success";
-                    reloadBtn.style.display = "block";
-                    html5QrcodeScanner.clear();
-                };
-
-                img.src = finalUrl; // เริ่มส่งข้อมูลทันทีที่กำหนด src
-
+                finalName = data.name;
+                finalLat = data.lat;
+                finalLng = data.lng;
             } catch (e) {
-                statusBox.innerText = "❌ รูปแบบ QR ไม่ถูกต้อง";
-                statusBox.className = "error";
+                // ถ้ารหัส QR ไม่ใช่ JSON (เช่น เป็นข้อความธรรมดา) 
+                // ให้ส่งค่าดิบไปเก็บในช่อง Name แทน เพื่อ Debug
+                finalName = "RAW_" + decodedText;
+                finalLat = "0";
+                finalLng = "0";
             }
+
+            // 2. ส่งไป Google Sheets ด้วยวิธี Image (ไม้ตาย)
+            const img = new Image();
+            const url = `${GOOGLE_URL}?n=${encodeURIComponent(finalName)}&la=${finalLat}&lo=${finalLng}&t=${Date.now()}`;
+    
+            img.onload = img.onerror = function() {
+                statusBox.innerText = "🚀 บันทึกเรียบร้อย! (มทส.)";
+                statusBox.className = "success";
+                document.getElementById('reloadBtn').style.display = "block";
+                html5QrcodeScanner.clear();
+            };
+
+            img.src = url;
         }
 
         // ตั้งค่ากล้อง
