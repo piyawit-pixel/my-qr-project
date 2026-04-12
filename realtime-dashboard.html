@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUT Hospital — Asset Tracking System</title>
+    <meta name="description" content="ระบบติดตามทรัพย์สินแบบเรียลไทม์ โรงพยาบาลมหาวิทยาลัยเทคโนโลยีสุรนารี">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --sut-orange: #E65100;
+            --sut-orange-light: #FF6D00;
+            --sut-gold: #FFB300;
+            --sut-gold-light: #FFD54F;
+            --bg-page: #F5F7FA;
+            --bg-card: #FFFFFF;
+            --border-light: #E8EAF0;
+            --border-orange: rgba(230,81,0,0.15);
+            --text-dark: #212121;
+            --text-body: #424242;
+            --text-muted: #9E9E9E;
+            --shadow-soft: 0 2px 12px rgba(0,0,0,0.06);
+            --shadow-card: 0 4px 24px rgba(0,0,0,0.08);
+            --shadow-orange: 0 4px 20px rgba(230,81,0,0.2);
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background: var(--bg-page);
+            color: var(--text-body);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* === HEADER === */
+        .header {
+            position: relative;
+            z-index: 100;
+            height: 64px;
+            padding: 0 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, #E65100 0%, #FF6D00 100%);
+            box-shadow: 0 4px 20px rgba(230,81,0,0.3);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .header-icon {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            backdrop-filter: blur(8px);
+        }
+
+        .header-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .header-sub {
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.75);
+            font-weight: 300;
+        }
+
+        .header-center { display: flex; align-items: center; gap: 4px; }
+
+        .header-right { display: flex; align-items: center; gap: 14px; }
+
+        /* === TABS === */
+        .tab-btn {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 20px;
+            border-radius: 100px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: rgba(255,255,255,0.6);
+            font-family: 'Kanit', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 400;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.08); }
+
+        .tab-btn.active {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.3);
+            color: #fff;
+            font-weight: 500;
+            backdrop-filter: blur(8px);
+        }
+
+        .tab-btn .tab-icon { font-size: 14px; }
+
+        /* === CONNECTION STATUS === */
+        .conn-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.4s ease;
+        }
+
+        .conn-status.connecting { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.8); }
+        .conn-status.connected { background: rgba(255,255,255,0.2); color: #fff; }
+        .conn-status.disconnected { background: rgba(255,59,48,0.2); color: #ffcdd2; }
+
+        .conn-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        .conn-status.disconnected .conn-dot { animation: none; opacity: 0.5; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .topic-badge {
+            padding: 6px 14px;
+            border-radius: 100px;
+            background: rgba(255,255,255,0.12);
+            color: rgba(255,255,255,0.85);
+            font-size: 0.72rem;
+            font-weight: 500;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* === MAIN === */
+        .main-content { position: relative; z-index: 1; height: calc(100vh - 64px); }
+
+        .tab-view { display: none; height: 100%; }
+        .tab-view.active { display: block; }
+
+        .map-view { position: relative; }
+        #map { width: 100%; height: 100%; }
+
+        /* === INFO PANEL === */
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            width: 320px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-card);
+            transition: all 0.3s ease;
+        }
+
+        .info-panel:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+
+        .info-header {
+            padding: 16px 20px 12px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(180deg, #FFF8E1 0%, #FFFFFF 100%);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .info-panel.collapsed .info-body,
+        .log-panel.collapsed .log-content-wrapper {
+            display: none;
+        }
+
+        .info-panel.collapsed .info-header,
+        .log-panel.collapsed .log-header {
+            border-bottom: none;
+        }
+
+        .panel-toggle {
+            font-size: 10px;
+            color: var(--sut-orange);
+            transition: transform 0.3s ease;
+            margin-left: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            background: rgba(230,81,0,0.1);
+            border-radius: 50%;
+        }
+
+        .collapsed .panel-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .info-header h3 { font-size: 0.85rem; font-weight: 600; color: var(--sut-orange); display: flex; align-items: center; gap: 8px; }
+
+        .live-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 100px;
+            background: rgba(230,81,0,0.1);
+            border: 1px solid rgba(230,81,0,0.2);
+            color: var(--sut-orange);
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .live-tag .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sut-orange); animation: blink 1.2s ease-in-out infinite; }
+
+        .info-body { padding: 16px 20px; }
+
+        .info-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+        .info-row + .info-row { border-top: 1px solid var(--border-light); }
+
+        .info-icon {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+            background: rgba(230,81,0,0.06);
+        }
+
+        .info-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+        .info-value { font-size: 0.9rem; font-weight: 600; color: var(--text-dark); }
+        .info-value.mono { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+
+        .info-empty { text-align: center; padding: 24px 0; color: var(--text-muted); font-size: 0.85rem; font-weight: 300; }
+        .info-empty .emoji { font-size: 28px; display: block; margin-bottom: 10px; opacity: 0.5; }
+
+        /* === LOG PANEL === */
+        .log-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 380px;
+            max-height: 280px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-card);
+        }
+
+        .log-header {
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(180deg, #FFF8E1 0%, #FFFFFF 100%);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .log-header h4 { font-size: 0.78rem; font-weight: 600; color: var(--sut-orange); display: flex; align-items: center; gap: 8px; }
+
+        .log-content-wrapper { display: flex; flex-direction: column; }
+        .log-search { padding: 10px 18px 2px 18px; }
+        .log-search input { 
+            width: 100%; 
+            padding: 8px 12px; 
+            border: 1px solid var(--border-light); 
+            border-radius: var(--radius-sm); 
+            font-family: 'Kanit', sans-serif; 
+            font-size: 0.75rem; 
+            background: #FAFAFA; 
+            outline: none; 
+            transition: all 0.2s; 
+            color: var(--text-body);
+        }
+        .log-search input:focus { border-color: var(--sut-orange); background: #FFF; box-shadow: 0 0 0 3px rgba(230,81,0,0.1); }
+
+        .log-count {
+            padding: 2px 8px;
+            border-radius: 100px;
+            background: rgba(230,81,0,0.1);
+            color: var(--sut-orange);
+            font-size: 0.65rem;
+            font-weight: 600;
+        }
+
+        .log-clear {
+            background: none;
+            border: 1px solid var(--border-light);
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            font-family: 'Kanit', sans-serif;
+            font-weight: 400;
+            padding: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .log-clear:hover { background: #FFF8E1; border-color: var(--sut-gold); color: var(--sut-orange); }
+
+        .log-body { max-height: 210px; overflow-y: auto; padding: 8px 0; }
+
+        .log-entry {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 18px;
+            transition: background 0.2s ease;
+            animation: logSlideIn 0.3s ease-out;
+        }
+
+        @keyframes logSlideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .log-entry:hover { background: #FAFAFA; }
+        .log-entry .log-time { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-muted); white-space: nowrap; margin-top: 2px; flex-shrink: 0; }
+        .log-entry .log-msg { font-size: 0.78rem; color: var(--text-body); line-height: 1.5; }
+        .log-entry .log-msg .log-name { color: var(--sut-orange); font-weight: 600; }
+        .log-entry .log-msg .log-coords { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; }
+        .log-entry.system .log-msg { color: #1565C0; font-style: italic; }
+        .log-entry.error .log-msg { color: #C62828; }
+
+        .log-empty { text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.78rem; font-weight: 300; }
+
+        /* === MARKER BOUNCE ANIMATION === */
+        @keyframes markerBounce {
+            0%   { transform: translateY(0); }
+            30%  { transform: translateY(-30px) scaleY(1.1); }
+            50%  { transform: translateY(0) scaleY(0.9); }
+            70%  { transform: translateY(-12px) scaleY(1.05); }
+            100% { transform: translateY(0) scaleY(1); }
+        }
+
+        @keyframes markerGlow {
+            0% { filter: drop-shadow(0 4px 12px rgba(230,81,0,0.4)); }
+            50% { filter: drop-shadow(0 0 25px rgba(230,81,0,0.9)) brightness(1.3); }
+            100% { filter: drop-shadow(0 4px 12px rgba(230,81,0,0.4)); }
+        }
+
+        .marker-anim-bounce {
+            animation: markerBounce 0.8s cubic-bezier(0.28, 0.84, 0.42, 1), markerGlow 1s ease-out;
+        }
+
+        /* === STATS BAR === */
+        .stats-bar { position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; gap: 10px; }
+
+        /* === RESET VIEW BUTTON === */
+        .reset-view-btn {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 24px;
+            border-radius: 100px;
+            border: 2px solid rgba(230,81,0,0.3);
+            background: linear-gradient(135deg, #E65100 0%, #FF6D00 100%);
+            color: #fff;
+            font-family: 'Kanit', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: 0 4px 24px rgba(230,81,0,0.4), 0 0 0 4px rgba(230,81,0,0.08);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            backdrop-filter: blur(8px);
+            white-space: nowrap;
+        }
+
+        .reset-view-btn.visible {
+            display: flex;
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .reset-view-btn:hover {
+            box-shadow: 0 8px 32px rgba(230,81,0,0.5), 0 0 0 6px rgba(230,81,0,0.12);
+            transform: translateX(-50%) translateY(-2px);
+        }
+
+        .reset-view-btn:active {
+            transform: translateX(-50%) translateY(0) scale(0.96);
+        }
+
+        .reset-view-btn .btn-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #fff;
+            animation: blink 1.2s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+
+        .stat-chip {
+            padding: 10px 18px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .stat-chip .stat-icon { font-size: 16px; }
+        .stat-chip .stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+        .stat-chip .stat-value { font-size: 1rem; font-weight: 700; }
+        .stat-chip .stat-value.accent-green { color: #2E7D32; }
+        .stat-chip .stat-value.accent-orange { color: var(--sut-orange); }
+
+        /* === HISTORY VIEW === */
+        .history-view {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: var(--bg-page);
+            font-family: 'Kanit', sans-serif;
+        }
+
+        .history-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 28px;
+            border-bottom: 1px solid var(--border-light);
+            background: linear-gradient(180deg, #FFF8E1 0%, var(--bg-page) 100%);
+            flex-shrink: 0;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .history-toolbar-left { display: flex; align-items: center; gap: 14px; }
+
+        .history-toolbar h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--sut-orange);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .history-toolbar-right { display: flex; align-items: center; gap: 10px; }
+
+        .limit-btn-group {
+            display: flex;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            border: 2px solid var(--sut-orange);
+            box-shadow: 0 2px 8px rgba(230,81,0,0.12);
+        }
+
+        .limit-btn {
+            padding: 8px 18px;
+            border: none;
+            background: #fff;
+            color: var(--sut-orange);
+            font-family: 'Kanit', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 400;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            border-right: 1px solid rgba(230,81,0,0.2);
+        }
+
+        .limit-btn:last-child { border-right: none; }
+        .limit-btn:hover { background: #FFF8E1; }
+
+        .limit-btn.active {
+            background: linear-gradient(135deg, #E65100 0%, #FF6D00 100%);
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .btn-refresh {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 22px;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--sut-orange);
+            background: linear-gradient(135deg, #E65100 0%, #FF6D00 100%);
+            color: #fff;
+            font-family: 'Kanit', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: var(--shadow-orange);
+        }
+
+        .btn-refresh:hover { box-shadow: 0 6px 24px rgba(230,81,0,0.35); transform: translateY(-1px); }
+        .btn-refresh:active { transform: translateY(0) scale(0.97); }
+        .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+        .btn-refresh .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
+        .btn-refresh.loading .spinner { display: block; }
+        .btn-refresh.loading .btn-text { display: none; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .history-status { font-size: 0.78rem; color: var(--text-muted); font-weight: 400; }
+
+        /* === TABLE === */
+        .history-table-wrapper { flex: 1; overflow: auto; padding: 0 16px 16px; }
+
+        .history-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; min-width: 700px; }
+        .history-table thead { position: sticky; top: 0; z-index: 10; }
+
+        .history-table thead th {
+            padding: 12px 20px;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--sut-orange);
+            background: #FFF8E1;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+        }
+
+        .history-table thead th:first-child { border-radius: 8px 0 0 8px; }
+        .history-table thead th:last-child { border-radius: 0 8px 8px 0; }
+
+        @keyframes rowHighlightAnim {
+            0% { background-color: #FFD54F; transform: scale(1.02); box-shadow: 0 4px 16px rgba(230,81,0,0.3); }
+            50% { background-color: #FFF8E1; transform: scale(1); }
+            100% { background-color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+        }
+
+        .row-highlight {
+            animation: rowHighlightAnim 3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important;
+        }
+
+        .history-table tbody tr {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+            border-radius: 8px;
+            animation: rowFadeIn 0.3s ease-out both;
+        }
+
+        .history-table tbody tr:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(230,81,0,0.12); }
+        .history-table tbody tr:active { transform: translateY(0); }
+
+        .history-table tbody td { padding: 16px 20px; font-size: 0.85rem; color: var(--text-body); vertical-align: middle; border-top: 1px solid transparent; border-bottom: 1px solid transparent; }
+        .history-table tbody td:first-child { border-left: 1px solid transparent; border-radius: 8px 0 0 8px; }
+        .history-table tbody td:last-child { border-right: 1px solid transparent; border-radius: 0 8px 8px 0; text-align: right; }
+
+        .history-table .td-idx { width: 50px; color: var(--sut-orange); font-size: 0.8rem; font-weight: 700; opacity: 0.6; }
+        .history-table .td-time { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-muted); }
+        .history-table .td-name { font-weight: 600; color: var(--text-dark); }
+        .history-table .td-user { font-size: 0.75rem; color: #1565C0; background: rgba(21,101,192,0.08); padding: 4px 10px; border-radius: 100px; display: inline-block; }
+        .history-table .td-coord { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-muted); }
+
+        .view-map-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 16px;
+            border-radius: 100px;
+            border: none;
+            background: linear-gradient(135deg, #E65100 0%, #FF6D00 100%);
+            color: #fff;
+            font-family: 'Kanit', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(230,81,0,0.2);
+        }
+
+        .view-map-btn:hover { box-shadow: 0 4px 12px rgba(230,81,0,0.3); transform: scale(1.02); }
+
+        .history-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+            text-align: center;
+            gap: 12px;
+        }
+
+        .history-empty .empty-emoji { font-size: 48px; opacity: 0.5; }
+        .history-empty .empty-text { font-size: 0.9rem; line-height: 1.6; color: var(--text-body); font-weight: 300; }
+
+        /* === SCROLLBARS === */
+        .log-body::-webkit-scrollbar, .history-table-wrapper::-webkit-scrollbar { width: 5px; height: 5px; }
+        .log-body::-webkit-scrollbar-track, .history-table-wrapper::-webkit-scrollbar-track { background: transparent; }
+        .log-body::-webkit-scrollbar-thumb, .history-table-wrapper::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 1024px) {
+            .info-panel { width: 280px; }
+            .log-panel { width: 320px; }
+        }
+
+        @media (max-width: 768px) {
+            .info-panel { width: 260px; top: 10px; left: 10px; }
+            .log-panel { width: 280px; bottom: 10px; right: 10px; }
+            .stats-bar { left: 10px; bottom: 10px; flex-wrap: wrap; }
+            .topic-badge { display: none; }
+            .header-title { font-size: 0.9rem; }
+            .tab-btn span:not(.tab-icon) { display: none; }
+            .tab-btn { padding: 8px 14px; }
+            .history-toolbar { padding: 14px 16px; }
+        }
+
+        @keyframes markerPulseAnim { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(4.5); opacity: 0; } }
+        @keyframes rowFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        @keyframes markerFlash {
+            0% { transform: scale(1) translateY(0); filter: brightness(1) drop-shadow(0 4px 12px rgba(230,81,0,0.4)); }
+            30% { transform: scale(1.4) translateY(-8px); filter: brightness(1.2) drop-shadow(0 15px 25px rgba(230,81,0,0.8)); }
+            100% { transform: scale(1) translateY(0); filter: brightness(1) drop-shadow(0 4px 12px rgba(230,81,0,0.4)); }
+        }
+        .marker-anim-flash svg {
+            animation: markerFlash 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .leaflet-container { background: var(--bg-page) !important; }
+    </style>
+</head>
+<body>
+
+    <header class="header" id="header">
+        <div class="header-left">
+            <div class="header-icon">🏥</div>
+            <div>
+                <div class="header-title">SUT Hospital — Asset Tracking System</div>
+                <div class="header-sub">ระบบติดตามทรัพย์สิน • MQTT Real-time</div>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <button class="tab-btn active" id="tabMap" onclick="switchTab('map')">
+                <span class="tab-icon">🗺️</span>
+                <span>Real-time Map</span>
+            </button>
+            <button class="tab-btn" id="tabHistory" onclick="switchTab('history')">
+                <span class="tab-icon">🚚</span>
+                <span>ประวัติการขนส่ง</span>
+            </button>
+        </div>
+
+        <div class="header-right">
+            <div class="topic-badge" id="topicBadge">📡 hospital/track</div>
+            <div class="conn-status connecting" id="connStatus">
+                <span class="conn-dot"></span>
+                <span id="connText">กำลังเชื่อมต่อ...</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-content">
+
+        <!-- TAB 1: MAP -->
+        <div class="tab-view active map-view" id="viewMap">
+            <div id="map"></div>
+
+            <div class="info-panel collapsed" id="infoPanel">
+                <div class="info-header" onclick="togglePanel('infoPanel')">
+                    <h3>📍 ข้อมูลตำแหน่ง</h3>
+                    <div style="display:flex; align-items:center;">
+                        <div class="live-tag" id="liveTag" style="display:none; margin-right: 8px;">
+                            <span class="live-dot"></span> LIVE
+                        </div>
+                        <div class="panel-toggle">▼</div>
+                    </div>
+                </div>
+                <div class="info-body" id="infoBody">
+                    <div class="info-empty" id="infoEmpty">
+                        <span class="emoji">📡</span>
+                        รอรับข้อมูลจาก MQTT...<br>
+                        <small style="color:var(--text-muted);">Subscribe: hospital/track</small>
+                    </div>
+                    <div id="infoContent" style="display:none;">
+                        <div class="info-row">
+                            <div class="info-icon">📍</div>
+                            <div><div class="info-label">ชื่อสถานที่</div><div class="info-value" id="infoName">—</div></div>
+                        </div>
+                        <div class="info-row" id="infoUserRow" style="display:none;">
+                            <div class="info-icon">👤</div>
+                            <div><div class="info-label">ผู้บันทึก</div><div class="info-value" id="infoUser">—</div></div>
+                        </div>
+                        <div style="display:flex; gap: 10px;">
+                            <div class="info-row" style="flex:1;">
+                                <div class="info-icon">🔵</div>
+                                <div><div class="info-label">Latitude</div><div class="info-value mono" id="infoLat">—</div></div>
+                            </div>
+                            <div class="info-row" style="flex:1;">
+                                <div class="info-icon">🟢</div>
+                                <div><div class="info-label">Longitude</div><div class="info-value mono" id="infoLng">—</div></div>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-icon">⏱️</div>
+                            <div><div class="info-label">อัปเดตล่าสุด</div><div class="info-value mono" id="infoTime">—</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="log-panel collapsed" id="logPanel">
+                <div class="log-header" onclick="togglePanel('logPanel')">
+                    <h4>📋 Event Log <span class="log-count" id="logCount">0</span></h4>
+                    <div style="display:flex; align-items:center; gap: 8px;">
+                        <button class="log-clear" onclick="event.stopPropagation(); clearLogs()">ล้าง</button>
+                        <div class="panel-toggle">▼</div>
+                    </div>
+                </div>
+                <div class="log-content-wrapper">
+                    <div class="log-search">
+                        <input type="text" id="logSearchInput" placeholder="🔍 ค้นหาสถานที่..." oninput="renderLogs()" autocomplete="off">
+                    </div>
+                    <div class="log-body" id="logBody">
+                        <div class="log-empty" id="logEmpty">ยังไม่มี Event</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="reset-view-btn" id="resetViewBtn" onclick="resetToLatestLocation()">
+                <span class="btn-pulse"></span>
+                📍 กลับไปตำแหน่งล่าสุด
+            </button>
+
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-chip">
+                    <span class="stat-icon">📨</span>
+                    <div><div class="stat-label">ข้อความ</div><div class="stat-value accent-green" id="statMessages">0</div></div>
+                </div>
+                <div class="stat-chip">
+                    <span class="stat-icon">⏱️</span>
+                    <div><div class="stat-label">Uptime</div><div class="stat-value accent-orange" id="statUptime">00:00</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: HISTORY -->
+        <div class="tab-view history-view" id="viewHistory">
+            <div class="history-toolbar">
+                <div class="history-toolbar-left">
+                    <h2>🚚 ประวัติการขนส่ง</h2>
+                    <span class="history-status" id="historyStatus"></span>
+                </div>
+                <div class="history-toolbar-right">
+                    <div class="limit-btn-group" id="limitBtnGroup">
+                        <button class="limit-btn active" data-limit="25" onclick="selectLimit(25)">25 รายการ</button>
+                        <button class="limit-btn" data-limit="50" onclick="selectLimit(50)">50 รายการ</button>
+                        <button class="limit-btn" data-limit="100" onclick="selectLimit(100)">100 รายการ</button>
+                    </div>
+                    <button class="btn-refresh" id="btnRefresh" onclick="fetchHistory()">
+                        <div class="spinner"></div>
+                        <span class="btn-text">🔄 โหลดข้อมูล</span>
+                    </button>
+                </div>
+            </div>
+            <div class="history-table-wrapper" id="historyTableWrapper">
+                <div class="history-empty" id="historyEmpty">
+                    <div class="empty-emoji">📋</div>
+                    <div class="empty-text">กดปุ่ม "โหลดข้อมูล" เพื่อดึงข้อมูลย้อนหลัง<br><small style="color:var(--text-muted);">จาก Google Sheets</small></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+
+    <script>
+        const MQTT_CONFIG = {
+            host: 'wss://5c43f9d08b6f48a9a160fe907db23534.s1.eu.hivemq.cloud:8884/mqtt',
+            options: {
+                username: 'pizza_user',
+                password: 'Password123',
+                clientId: 'dashboard_' + Math.random().toString(16).slice(2, 10),
+                clean: true,
+                reconnectPeriod: 3000,
+                connectTimeout: 10000
+            },
+            topic: 'hospital/track'
+        };
+
+        const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzgBQsZb3fO_d1QE-ztluNh6gwXDz72aNHNUWcZnTyrO6J1jjsI9LT7nQ7FgedA0tA/exec';
+        const DEFAULT_CENTER = [14.8800, 102.0200];
+        const DEFAULT_ZOOM = 15;
+
+        let map, marker, mqttClient;
+        let messageCount = 0;
+        let startTime = Date.now();
+        let logs = [];
+        let historyData = [];
+        let currentTab = 'map';
+        let selectedLimit = 25;
+        let latestLocation = null; // { lat, lng, name, time }
+        let autoPanEnabled = true; // auto-pan to new MQTT data
+        let isViewingHistory = false; // user is viewing a historical point
+
+        // === TAB ===
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tabMap').classList.toggle('active', tab === 'map');
+            document.getElementById('tabHistory').classList.toggle('active', tab === 'history');
+            document.getElementById('viewMap').classList.toggle('active', tab === 'map');
+            document.getElementById('viewHistory').classList.toggle('active', tab === 'history');
+            if (tab === 'map' && map) setTimeout(() => map.invalidateSize(), 100);
+            if (tab === 'history' && historyData.length === 0) fetchHistory();
+        }
+
+        // === MAP ===
+        function initMap() {
+            map = L.map('map', { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, zoomControl: false });
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '&copy; <a href="https://www.esri.com/">Esri</a> — Esri, Maxar, Earthstar Geographics',
+                maxZoom: 19
+            }).addTo(map);
+            L.control.zoom({ position: 'topright' }).addTo(map);
+            marker = L.marker(DEFAULT_CENTER, { icon: createMarkerIcon(), opacity: 0 }).addTo(map);
+
+            // Detect when user manually pans the map — show Reset View if away from latest
+            map.on('moveend', checkResetViewVisibility);
+        }
+
+        function checkResetViewVisibility() {
+            const btn = document.getElementById('resetViewBtn');
+            if (!latestLocation) { btn.classList.remove('visible'); return; }
+
+            const center = map.getCenter();
+            const latestLatLng = L.latLng(latestLocation.lat, latestLocation.lng);
+            const distance = center.distanceTo(latestLatLng); // meters
+
+            // Show button if map center is >100m away from latest location
+            if (distance > 100) {
+                btn.classList.add('visible');
+            } else {
+                btn.classList.remove('visible');
+            }
+        }
+
+        function resetToLatestLocation() {
+            if (!latestLocation) return;
+            isViewingHistory = false;
+            autoPanEnabled = true;
+
+            marker.setLatLng([latestLocation.lat, latestLocation.lng]);
+            marker.setOpacity(1);
+            marker.unbindPopup();
+            marker.bindPopup(`
+                <div style="font-family:Kanit,sans-serif;padding:6px;min-width:160px;">
+                    <div style="font-weight:600;font-size:14px;color:#E65100;margin-bottom:4px;">${escapeHtml(latestLocation.name)}</div>
+                    <div style="color:#666;font-size:12px;font-family:'JetBrains Mono',monospace;">${latestLocation.lat.toFixed(6)}, ${latestLocation.lng.toFixed(6)}</div>
+                    <div style="color:#999;font-size:11px;margin-top:4px;">🕐 ${latestLocation.time}</div>
+                </div>
+            `).openPopup();
+
+            map.flyTo([latestLocation.lat, latestLocation.lng], map.getZoom() < 15 ? 16 : map.getZoom(), { duration: 1.2 });
+            updateInfoPanel(latestLocation.name, latestLocation.lat, latestLocation.lng, latestLocation.time);
+
+            // Hide the button
+            document.getElementById('resetViewBtn').classList.remove('visible');
+
+            addLog('system', `กลับไปตำแหน่งล่าสุด: ${latestLocation.name}`);
+        }
+
+        function createMarkerIcon() {
+            return L.divIcon({
+                html: `<div style="position:relative;width:44px;height:44px;">
+                    <div style="position:absolute;top:50%;left:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:rgba(230,81,0,0.5);animation:markerPulseAnim 1.5s ease-out infinite;"></div>
+                    <div id="markerWrapper" style="transform-origin: bottom center;">
+                        <svg width="44" height="56" viewBox="0 0 44 56" fill="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:-28px;left:-10px;filter:drop-shadow(0 4px 12px rgba(230,81,0,0.4));transform-origin: bottom center;">
+                            <defs><linearGradient id="mg" x1="0" y1="0" x2="44" y2="56" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#E65100"/><stop offset="1" stop-color="#FF6D00"/>
+                            </linearGradient></defs>
+                            <path d="M22 0C10 0 0 10 0 22c0 16.5 22 34 22 34s22-17.5 22-34C44 10 34 0 22 0z" fill="url(#mg)"/>
+                            <circle cx="22" cy="20" r="8" fill="white" fill-opacity="0.95"/>
+                            <circle cx="22" cy="20" r="4" fill="#E65100"/>
+                        </svg>
+                    </div>
+                </div>`,
+                iconSize: [44, 56], iconAnchor: [22, 56], popupAnchor: [0, -56], className: ''
+            });
+        }
+
+        // === MQTT ===
+        function initMQTT() {
+            addLog('system', 'กำลังเชื่อมต่อ MQTT...');
+            setConnectionStatus('connecting', 'กำลังเชื่อมต่อ...');
+            try { mqttClient = mqtt.connect(MQTT_CONFIG.host, MQTT_CONFIG.options); }
+            catch (err) { addLog('error', `เชื่อมต่อล้มเหลว: ${err.message}`); setConnectionStatus('disconnected', 'เชื่อมต่อล้มเหลว'); return; }
+
+            mqttClient.on('connect', () => {
+                setConnectionStatus('connected', 'เชื่อมต่อแล้ว');
+                addLog('system', `เชื่อมต่อ HiveMQ สำเร็จ (${MQTT_CONFIG.options.clientId})`);
+                mqttClient.subscribe(MQTT_CONFIG.topic, { qos: 1 }, (err) => {
+                    if (err) addLog('error', `Subscribe ล้มเหลว: ${err.message}`);
+                    else addLog('system', `Subscribe: ${MQTT_CONFIG.topic} ✓`);
+                });
+            });
+
+            mqttClient.on('message', (topic, payload) => {
+                try {
+                    const raw = payload.toString();
+                    const decoded = decodeURIComponent(raw);
+                    const data = JSON.parse(decoded);
+                    handleTrackingData(data);
+                } catch (err) {
+                    try { const data = JSON.parse(payload.toString()); handleTrackingData(data); }
+                    catch (err2) { addLog('error', `JSON parse error: ${err2.message}`); }
+                }
+            });
+
+            mqttClient.on('error', (err) => { addLog('error', `MQTT Error: ${err.message}`); setConnectionStatus('disconnected', 'ข้อผิดพลาด'); });
+            mqttClient.on('reconnect', () => { setConnectionStatus('connecting', 'กำลังเชื่อมต่อใหม่...'); addLog('system', 'กำลังเชื่อมต่อใหม่...'); });
+            mqttClient.on('close', () => setConnectionStatus('disconnected', 'ขาดการเชื่อมต่อ'));
+            mqttClient.on('offline', () => setConnectionStatus('disconnected', 'ออฟไลน์'));
+        }
+
+        function handleTrackingData(data) {
+            let name, lat, lng, user;
+            if (Array.isArray(data)) {
+                name = data[1];
+                lat = data[2];
+                lng = data[3];
+                user = data[4];
+            } else {
+                name = data.name || data.Name;
+                lat = data.lat || data.Lat;
+                lng = data.lng || data.Lng;
+                user = data.user || data.User;
+            }
+            
+            const parsedLat = parseFloat(lat), parsedLng = parseFloat(lng);
+            if (isNaN(parsedLat) || isNaN(parsedLng)) { 
+                return; // ข้ามการทำงานไปเลย ไม่ต้องแจ้งเตือน
+            }
+
+            const placeName = name || 'ไม่ระบุชื่อ';
+            const userName = user || 'ไม่ระบุ';
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('th-TH', { hour12: false });
+
+            // Save as latest location for Reset View
+            latestLocation = { lat: parsedLat, lng: parsedLng, name: placeName, user: userName, time: timeStr };
+
+            messageCount++;
+            document.getElementById('statMessages').textContent = messageCount;
+            marker.setLatLng([parsedLat, parsedLng]);
+            marker.setOpacity(1);
+
+            marker.unbindPopup();
+            marker.bindPopup(`
+                <div style="font-family:Kanit,sans-serif;padding:6px;min-width:180px;">
+                    <div style="font-weight:600;font-size:15px;color:#E65100;margin-bottom:6px;border-bottom:1px solid #eee;padding-bottom:6px;">${escapeHtml(placeName)}</div>
+                    <div style="color:#666;font-size:12px;margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+                        <span>👤</span> <strong>${escapeHtml(userName)}</strong>
+                    </div>
+                    <div style="color:#888;font-size:11px;font-family:'JetBrains Mono',monospace;">${parsedLat.toFixed(6)}, ${parsedLng.toFixed(6)}</div>
+                    <div style="color:#aba;font-size:10px;margin-top:6px;">🕐 อัปเดตเมื่อ: ${timeStr}</div>
+                </div>
+            `);
+
+            // Auto-Center: pan map instantly to newest location (Fluid UI)
+            map.panTo([parsedLat, parsedLng]);
+
+            // Smooth Animation: Trigger Bounce/Drop flash animation
+            const markerWrapper = document.getElementById('markerWrapper');
+            if (markerWrapper) {
+                markerWrapper.classList.remove('marker-anim-bounce');
+                void markerWrapper.offsetWidth; // trigger reflow
+                markerWrapper.classList.add('marker-anim-bounce');
+            }
+
+            // If user was viewing history, reset that state
+            isViewingHistory = false;
+            autoPanEnabled = true;
+
+            updateInfoPanel(placeName, parsedLat, parsedLng, timeStr, userName);
+            
+            // Sync with Log (Side Panel)
+            addLog('data', null, { name: placeName, lat: parsedLat, lng: parsedLng, user: userName });
+
+            // Sync with History Table (Bottom Table) via Direct Row Injection
+            historyData.unshift([timeStr, placeName, parsedLat, parsedLng, userName]);
+            if (historyData.length > selectedLimit) historyData.pop();
+
+            const tableBody = document.querySelector('.history-table tbody');
+            if (tableBody) {
+                // ถ้ามีหน้า "ไม่พบข้อมูล" หรือตารางว่าง ให้เรนเดอร์ใหม่ปกติ
+                if (document.querySelector('.history-empty')) {
+                    renderHistoryTable();
+                } else {
+                    const tr = document.createElement('tr');
+                    tr.style.animationDelay = '0s';
+                    tr.className = 'row-highlight';
+                    tr.onclick = function(e) { viewOnMap(parsedLat, parsedLng, placeName, userName); };
+                    
+                    tr.innerHTML = `
+                        <td class="td-idx">NEW</td>
+                        <td class="td-time">${escapeHtml(timeStr)}</td>
+                        <td class="td-name">${escapeHtml(placeName)}</td>
+                        <td><span class="td-user">👤 ${escapeHtml(userName)}</span></td>
+                        <td class="td-coord">${parsedLat.toFixed(6)}, ${parsedLng.toFixed(6)}</td>
+                        <td class="td-action"><button class="view-map-btn" onclick="event.stopPropagation(); viewOnMap(${parsedLat}, ${parsedLng}, '${escapeHtml(placeName)}', '${escapeHtml(userName)}')">📍 แผนที่</button></td>
+                    `;
+                    
+                    tableBody.prepend(tr); // แทรกแถวบนสุดทันที (Instant Update)
+                    
+                    // รันอัปเดตตัวเลขลำดับ (Index) โดนข้ามคำว่า NEW
+                    const rows = tableBody.querySelectorAll('tr');
+                    if (rows.length > selectedLimit) rows[rows.length - 1].remove();
+
+                    tableBody.querySelectorAll('tr').forEach((rowElem, idx) => {
+                        const idxTd = rowElem.querySelector('.td-idx');
+                        if (idxTd && idxTd.textContent !== 'NEW') {
+                            idxTd.textContent = idx + 1;
+                        }
+                    });
+                }
+            } else {
+                renderHistoryTable();
+            }
+
+            // Hide Reset View button since we just panned to latest
+            document.getElementById('resetViewBtn').classList.remove('visible');
+
+            // MQTT-Triggered Fetch: อาศัยสัญญาณเพื่อดึงข้อมูลจาก Sheets ทันทีไม่ต้องรอโหลด
+            fetchHistory();
+        }
+
+        // === HISTORY ===
+        function selectLimit(limit) {
+            selectedLimit = limit;
+            document.querySelectorAll('.limit-btn').forEach(btn => btn.classList.toggle('active', parseInt(btn.dataset.limit) === limit));
+            fetchHistory();
+        }
+
+        async function fetchHistory() {
+            const btn = document.getElementById('btnRefresh');
+            const statusEl = document.getElementById('historyStatus');
+            btn.classList.add('loading');
+            btn.disabled = true;
+            statusEl.textContent = 'กำลังโหลด...';
+
+            try {
+                // Cache Busting: บังคับหลีกเลี่ยง Cache ทันที
+                const url = `${SHEETS_API_URL}?limit=${selectedLimit}&cacheBuster=${new Date().getTime()}`;
+                // Fetch Priority: บังคับ request ห้ามเก็บแคช
+                const res = await fetch(url, { cache: 'no-store' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const rawData = await res.json();
+                let allData = Array.isArray(rawData) ? rawData : (rawData.data || []);
+                historyData = allData.slice(0, selectedLimit);
+                renderHistoryTable();
+                statusEl.textContent = `แสดง ${historyData.length} รายการ`;
+
+                // Center Map: เลื่อนแผนที่ไปโฟกัสที่จุดล่าสุดทันที
+                if (historyData.length > 0) {
+                    const latest = historyData[0];
+                    let name = latest[1] || latest.name || 'ไม่ระบุชื่อ';
+                    let lat = parseFloat(latest[2] || latest.lat || latest.latitude);
+                    let lng = parseFloat(latest[3] || latest.lng || latest.longitude);
+                    let user = latest[4] || latest.user || 'ไม่ระบุ';
+                    let time = latest[0] || latest.timestamp || '—';
+
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        latestLocation = { lat, lng, name, user, time };
+                        marker.setLatLng([lat, lng]);
+                        marker.setOpacity(1);
+                        map.setView([lat, lng], map.getZoom() < 15 ? 16 : map.getZoom());
+                        updateInfoPanel(name, lat, lng, time, user);
+                    }
+                }
+            } catch (err) {
+                statusEl.textContent = `โหลดล้มเหลว: ${err.message}`;
+                renderHistoryEmpty(`ไม่สามารถดึงข้อมูลได้<br><small style="color:var(--text-muted);">${escapeHtml(err.message)}</small>`);
+            } finally { btn.classList.remove('loading'); btn.disabled = false; }
+        }
+
+        let lastKnownTopRecord = null; // System var to track if we received new data
+
+        function renderHistoryTable() {
+            const wrapper = document.getElementById('historyTableWrapper');
+            if (historyData.length === 0) { renderHistoryEmpty('ไม่พบข้อมูล'); return; }
+
+            let html = `<table class="history-table"><thead><tr>
+                <th>#</th><th>เวลา</th><th>ชื่อสถานที่</th><th>ผู้บันทึก</th><th>พิกัด</th><th></th>
+            </tr></thead><tbody>`;
+
+            historyData.forEach((row, i) => {
+                // Data Mapping Fix: ดึงค่าตาม Index 1, 2, 3, 4 หรือ Fallback ไปหา key
+                let time = row[0] || row.timestamp || row.time || '—';
+                let name = row[1] || row.name || row['ชื่อสถานที่'] || '—';
+                let lat = parseFloat(row[2] || row.lat || row['ละติจูด']);
+                let lng = parseFloat(row[3] || row.lng || row['ลองจิจูด']);
+                let user = row[4] || row.user || row['ผู้บันทึก'] || '—';
+
+                // Validation: ข้ามการแสดงผลหากพิกัดไม่ใช่ตัวเลข
+                if (isNaN(lat) || isNaN(lng)) return;
+
+                // Visual Alert: เช็คว่านี่คือข้อมูลใหม่ในรอบพูลลิ่งหรือเปล่า
+                let isNewRecord = false;
+                if (i === 0) {
+                    const recordIdentifier = `${time}-${name}`;
+                    if (lastKnownTopRecord && lastKnownTopRecord !== recordIdentifier) {
+                        isNewRecord = true;
+                    }
+                    lastKnownTopRecord = recordIdentifier; // บันทึกสเตทล่าสุดไว้กันการกระพริบซ้ำ
+                }
+
+                html += `<tr onclick="viewOnMap(${lat}, ${lng}, '${escapeHtml(String(name))}', '${escapeHtml(String(user))}')" class="${isNewRecord ? 'row-highlight' : ''}" style="animation-delay:${i * 0.03}s">
+                    <td class="td-idx">${i + 1}</td>
+                    <td class="td-time">${escapeHtml(String(time))}</td>
+                    <td class="td-name">${escapeHtml(String(name))}</td>
+                    <td><span class="td-user">👤 ${escapeHtml(String(user))}</span></td>
+                    <td class="td-coord">${lat.toFixed(6)}, ${lng.toFixed(6)}</td>
+                    <td class="td-action"><button class="view-map-btn" onclick="event.stopPropagation(); viewOnMap(${lat}, ${lng}, '${escapeHtml(String(name))}', '${escapeHtml(String(user))}')">📍 แผนที่</button></td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            wrapper.innerHTML = html;
+        }
+
+        function renderHistoryEmpty(msg) {
+            document.getElementById('historyTableWrapper').innerHTML = `<div class="history-empty"><div class="empty-emoji">📋</div><div class="empty-text">${msg}</div></div>`;
+        }
+
+        function viewOnMap(lat, lng, name, user) {
+            const pLat = parseFloat(lat);
+            const pLng = parseFloat(lng);
+            
+            if (isNaN(pLat) || isNaN(pLng)) { 
+                return; // ข้ามไปเลย ไม่ต้อง alert
+            }
+
+            isViewingHistory = true;
+            switchTab('map');
+            marker.setLatLng([pLat, pLng]);
+            marker.setOpacity(1);
+            marker.unbindPopup();
+            marker.bindPopup(`
+                <div style="font-family:Kanit,sans-serif;padding:6px;min-width:180px;">
+                    <div style="font-weight:600;font-size:15px;color:#E65100;margin-bottom:6px;border-bottom:1px solid #eee;padding-bottom:6px;">${escapeHtml(name)}</div>
+                    <div style="color:#666;font-size:12px;margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+                        <span>👤</span> <strong>${escapeHtml(user || 'ไม่ระบุ')}</strong>
+                    </div>
+                    <div style="color:#888;font-size:11px;font-family:'JetBrains Mono',monospace;">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+                    <div style="color:#aba;font-size:10px;margin-top:6px;">📜 ดึงจากประวัติ</div>
+                </div>
+            `).openPopup();
+
+            // Trigger marker flash animation here as well
+            const markerWrapper = document.getElementById('markerWrapper');
+            if (markerWrapper) {
+                markerWrapper.classList.remove('marker-anim-flash');
+                void markerWrapper.offsetWidth;
+                markerWrapper.classList.add('marker-anim-flash');
+            }
+
+            setTimeout(() => { map.invalidateSize(); map.flyTo([pLat, pLng], 17, { duration: 1.5 }); }, 200);
+            updateInfoPanel(name, pLat, pLng, new Date().toLocaleTimeString('th-TH', { hour12: false }), user);
+        }
+
+        // === UI ===
+        function togglePanel(panelId) {
+            document.getElementById(panelId).classList.toggle('collapsed');
+        }
+
+        function setConnectionStatus(status, text) {
+            document.getElementById('connStatus').className = 'conn-status ' + status;
+            document.getElementById('connText').textContent = text;
+        }
+
+        function updateInfoPanel(name, lat, lng, time, user) {
+            document.getElementById('infoEmpty').style.display = 'none';
+            document.getElementById('infoContent').style.display = 'block';
+            document.getElementById('liveTag').style.display = 'flex';
+            document.getElementById('infoName').textContent = name;
+            document.getElementById('infoLat').textContent = lat.toFixed(6);
+            document.getElementById('infoLng').textContent = lng.toFixed(6);
+            document.getElementById('infoTime').textContent = time;
+
+            const userRow = document.getElementById('infoUserRow');
+            if (user) {
+                userRow.style.display = 'flex';
+                document.getElementById('infoUser').textContent = user;
+            } else {
+                userRow.style.display = 'none';
+            }
+
+            const panel = document.getElementById('infoPanel');
+            panel.style.borderColor = 'rgba(230,81,0,0.3)';
+            setTimeout(() => { panel.style.borderColor = ''; }, 600);
+        }
+
+        // === LOG ===
+        function addLog(type, message, data) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            let entry = { type, time: timeStr };
+            if (type === 'data' && data) {
+                const userTag = data.user ? `<span style="color:#1565c0;font-size:0.7rem;background:rgba(21,101,192,0.1);padding:1px 6px;border-radius:10px;margin-left:6px;">👤 ${escapeHtml(data.user)}</span>` : '';
+                entry.html = `<span class="log-name">${escapeHtml(data.name)}</span>${userTag}<br><span class="log-coords">${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}</span>`;
+            } else { entry.html = escapeHtml(message); }
+            logs.unshift(entry);
+            if (logs.length > 50) logs.pop();
+            renderLogs();
+        }
+
+        function renderLogs() {
+            const body = document.getElementById('logBody');
+            const searchInput = document.getElementById('logSearchInput');
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+
+            document.getElementById('logCount').textContent = logs.length;
+            if (logs.length === 0) { body.innerHTML = '<div class="log-empty">ยังไม่มี Event</div>'; return; }
+
+            const filteredLogs = logs.filter(l => {
+                if (!searchTerm) return true;
+                const text = l.html.replace(/<[^>]*>?/gm, '').toLowerCase(); // strip HTML
+                return text.includes(searchTerm);
+            });
+
+            if (filteredLogs.length === 0) {
+                 body.innerHTML = '<div class="log-empty">ไม่พบผลการค้นหา</div>'; return;
+            }
+
+            body.innerHTML = filteredLogs.map(l => `<div class="log-entry ${l.type}"><span class="log-time">${l.time}</span><span class="log-msg">${l.html}</span></div>`).join('');
+        }
+
+        function clearLogs() { 
+            logs = []; 
+            const searchInput = document.getElementById('logSearchInput');
+            if (searchInput) searchInput.value = '';
+            renderLogs(); 
+        }
+
+        // === UPTIME ===
+        function updateUptime() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const h = Math.floor(elapsed / 3600), m = Math.floor((elapsed % 3600) / 60), s = elapsed % 60;
+            document.getElementById('statUptime').textContent = h > 0
+                ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+                : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+        setInterval(updateUptime, 1000);
+
+        function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+        // Start modules
+        initMap();
+        initMQTT();
+
+        // Auto-Polling สำรองการดึงข้อมูลจาก Google Sheets
+        window.onload = function() {
+            setInterval(() => {
+                // รันเฉพาะถ้าเราไม่ได้กำลังโฟกัสข้อมูลอื่นอยู่ เพื่อป้องกันการรบกวน
+                if (!isViewingHistory) {
+                    fetchHistory();
+                }
+            }, 10000);
+        };
+    </script>
+</body>
+</html>
