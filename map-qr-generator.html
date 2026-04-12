@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUT Hospital — Map QR Generator</title>
+    <meta name="description" content="ระบบสร้าง QR Code จากพิกัดบนแผนที่ สำหรับโรงพยาบาลมหาวิทยาลัยเทคโนโลยีสุรนารี">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --sut-orange: #E65100;
+            --sut-orange-light: #FF6D00;
+            --sut-gold: #FFB300;
+            --sut-gold-light: #FFD54F;
+            --bg-page: #F5F7FA;
+            --bg-card: #FFFFFF;
+            --bg-sidebar: #FFFFFF;
+            --border-light: #E8EAF0;
+            --border-orange: rgba(230,81,0,0.15);
+            --text-dark: #212121;
+            --text-body: #424242;
+            --text-muted: #9E9E9E;
+            --shadow-soft: 0 2px 12px rgba(0,0,0,0.06);
+            --shadow-card: 0 4px 24px rgba(0,0,0,0.08);
+            --shadow-orange: 0 4px 20px rgba(230,81,0,0.2);
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background: var(--bg-page);
+            color: var(--text-body);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* === HEADER === */
+        .header {
+            position: relative;
+            z-index: 10;
+            padding: 0 28px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, #E65100 0%, #FF6D00 100%);
+            box-shadow: 0 4px 20px rgba(230,81,0,0.3);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .header-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            backdrop-filter: blur(8px);
+        }
+
+        .header-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .header-subtitle {
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.75);
+            font-weight: 300;
+        }
+
+        .header-badge {
+            padding: 6px 16px;
+            border-radius: 100px;
+            background: rgba(255,255,255,0.18);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 500;
+            backdrop-filter: blur(8px);
+        }
+
+        /* === MAIN LAYOUT === */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 64px);
+        }
+
+        /* === MAP === */
+        .map-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        #map { width: 100%; height: 100%; }
+
+        .map-instruction {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            padding: 12px 28px;
+            background: rgba(255,255,255,0.95);
+            border: 1px solid var(--border-light);
+            border-radius: 100px;
+            color: var(--text-body);
+            font-size: 0.85rem;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: var(--shadow-card);
+            animation: slideUp 0.6s ease-out;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .map-instruction .pulse-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--sut-orange);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.5); }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* === SIDEBAR === */
+        .sidebar {
+            width: 400px;
+            background: var(--bg-sidebar);
+            border-left: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: -4px 0 24px rgba(0,0,0,0.04);
+        }
+
+        .sidebar-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-light);
+            background: linear-gradient(180deg, #FFF8E1 0%, #FFFFFF 100%);
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--sut-orange);
+            margin-bottom: 4px;
+        }
+
+        .sidebar-header p {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-weight: 300;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        /* === EMPTY STATE === */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 14px;
+        }
+
+        .empty-state .empty-icon { font-size: 48px; opacity: 0.5; }
+
+        .empty-state .empty-text {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.7;
+            font-weight: 300;
+        }
+
+        /* === INFO CARD === */
+        .info-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            padding: 18px;
+            box-shadow: var(--shadow-soft);
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .info-card-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--sut-orange);
+            margin-bottom: 10px;
+        }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+        }
+
+        .info-row + .info-row { border-top: 1px solid var(--border-light); }
+
+        .info-row-icon {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .info-row-icon.name { background: rgba(230,81,0,0.1); }
+        .info-row-icon.lat { background: rgba(33,150,243,0.1); }
+        .info-row-icon.lng { background: rgba(76,175,80,0.1); }
+
+        .info-row-content { flex: 1; min-width: 0; }
+
+        .info-row-content small {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .info-row-content .value {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        /* === BUTTONS === */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: var(--radius-sm);
+            font-family: 'Kanit', sans-serif;
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.25s ease;
+        }
+
+        .btn:active { transform: scale(0.97); }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #E65100 0%, #FF6D00 100%);
+            color: #fff;
+            box-shadow: var(--shadow-orange);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 6px 28px rgba(230,81,0,0.35);
+            transform: translateY(-1px);
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, #E65100 0%, #FF6D00 100%);
+            color: #fff;
+            border: none;
+            box-shadow: var(--shadow-orange);
+        }
+
+        .btn-download:hover {
+            box-shadow: 0 6px 28px rgba(230,81,0,0.35);
+            transform: translateY(-1px);
+        }
+
+        .btn-download svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn-group .btn-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-group .btn-row .btn { flex: 1; }
+
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+        .btn-save-open {
+            background: #fff;
+            color: var(--sut-orange);
+            border: 2px solid var(--sut-orange);
+            width: 100%;
+            font-size: 0.82rem;
+            padding: 11px 16px;
+        }
+
+        .btn-save-open:hover {
+            background: #FFF3E0;
+            transform: translateY(-1px);
+        }
+
+        .btn-save-open svg {
+            width: 15px;
+            height: 15px;
+            flex-shrink: 0;
+        }
+
+        /* === QR CODE === */
+        .qr-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .qr-frame {
+            background: #fff;
+            border-radius: var(--radius-md);
+            padding: 24px 24px 16px;
+            box-shadow: var(--shadow-card);
+            border: 2px solid var(--sut-gold);
+            text-align: center;
+        }
+
+        .qr-frame canvas, .qr-frame img {
+            display: block;
+            border-radius: 4px;
+            margin: 0 auto;
+        }
+
+        .qr-label {
+            margin-top: 14px;
+            font-family: 'Kanit', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--sut-orange);
+            text-align: center;
+            word-break: break-word;
+            line-height: 1.4;
+            max-width: 220px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .qr-label-coords {
+            font-size: 0.72rem;
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-top: 2px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .qr-data-preview {
+            width: 100%;
+            background: #FFF8E1;
+            border: 1px solid rgba(255,179,0,0.3);
+            border-radius: var(--radius-sm);
+            padding: 14px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-body);
+            word-break: break-all;
+            line-height: 1.6;
+        }
+
+        .qr-data-preview .json-key { color: var(--sut-orange); }
+        .qr-data-preview .json-value { color: #2E7D32; }
+
+        /* === MARKER LIST === */
+        .marker-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .marker-list-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .marker-list-title .count-badge {
+            background: rgba(230,81,0,0.1);
+            color: var(--sut-orange);
+            padding: 2px 8px;
+            border-radius: 100px;
+            font-size: 0.65rem;
+        }
+
+        .marker-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: var(--bg-page);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .marker-item:hover {
+            background: #FFF8E1;
+            border-color: var(--sut-gold);
+        }
+
+        .marker-item .marker-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--sut-orange);
+            flex-shrink: 0;
+        }
+
+        .marker-item .marker-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-dark);
+        }
+
+        .marker-item .marker-coords {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* === SCROLLBAR === */
+        .sidebar-content::-webkit-scrollbar { width: 5px; }
+        .sidebar-content::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-content::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+
+        /* === MODAL === */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.35);
+            backdrop-filter: blur(6px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        .modal-card {
+            background: #fff;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            width: 420px;
+            max-width: 90vw;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.15);
+            animation: modalPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes modalPop {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .modal-card h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--sut-orange);
+            margin-bottom: 6px;
+        }
+
+        .modal-card p {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            font-weight: 300;
+        }
+
+        .modal-coords {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .modal-coord-chip {
+            padding: 6px 14px;
+            background: rgba(230,81,0,0.06);
+            border: 1px solid rgba(230,81,0,0.15);
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--sut-orange);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .input-group { display: flex; flex-direction: column; gap: 8px; }
+
+        .input-group label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-body);
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-page);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            color: var(--text-dark);
+            font-family: 'Kanit', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 400;
+            outline: none;
+            transition: all 0.25s ease;
+        }
+
+        .input-field::placeholder { color: var(--text-muted); }
+
+        .input-field:focus {
+            border-color: var(--sut-orange);
+            box-shadow: 0 0 0 3px rgba(230,81,0,0.1);
+        }
+
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-actions .btn { flex: 1; }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border-light);
+        }
+
+        .btn-ghost:hover {
+            background: var(--bg-page);
+            color: var(--text-body);
+        }
+
+        /* === RESPONSIVE (Tablet + Mobile) === */
+        @media (max-width: 1024px) {
+            .sidebar { width: 360px; }
+        }
+
+        @media (max-width: 900px) {
+            .main-container { flex-direction: column; }
+            .sidebar {
+                width: 100%;
+                height: 45vh;
+                border-left: none;
+                border-top: 1px solid var(--border-light);
+            }
+            .map-wrapper { height: 55vh; }
+        }
+
+        @media (max-width: 600px) {
+            .header { padding: 0 16px; }
+            .header-title { font-size: 0.95rem; }
+            .header-badge { display: none; }
+            .sidebar-content { padding: 16px; }
+        }
+
+        /* === TOAST === */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 10000;
+            padding: 14px 24px;
+            background: #fff;
+            border: 1px solid var(--sut-gold);
+            border-left: 4px solid var(--sut-orange);
+            border-radius: var(--radius-sm);
+            color: var(--text-dark);
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: var(--shadow-card);
+            animation: toastIn 0.4s ease-out;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .toast.fade-out { animation: toastOut 0.4s ease-in forwards; }
+
+        @keyframes toastOut {
+            to { opacity: 0; transform: translateY(10px) scale(0.95); }
+        }
+
+        .leaflet-container { background: var(--bg-page) !important; }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header class="header" id="header">
+        <div class="header-brand">
+            <div class="header-icon">🏥</div>
+            <div>
+                <div class="header-title">SUT Hospital — Map QR Generator</div>
+                <div class="header-subtitle">ระบบสร้าง QR Code สำหรับจุดติดตามทรัพย์สินโรงพยาบาล</div>
+            </div>
+        </div>
+        <div class="header-badge">🟢 พร้อมใช้งาน</div>
+    </header>
+
+    <!-- MAIN -->
+    <div class="main-container">
+        <!-- MAP -->
+        <div class="map-wrapper">
+            <div id="map"></div>
+            <div class="map-instruction" id="mapInstruction">
+                <span class="pulse-dot"></span>
+                คลิกที่ใดก็ได้บนแผนที่เพื่อสร้าง QR Code
+            </div>
+        </div>
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>📎 QR Code Generator</h2>
+                <p>คลิกจุดบนแผนที่เพื่อเลือกพิกัดและสร้าง QR Code</p>
+            </div>
+            <div class="sidebar-content" id="sidebarContent">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-icon">🗺️</div>
+                    <div class="empty-text">
+                        ยังไม่ได้เลือกตำแหน่ง<br>
+                        คลิกบนแผนที่เพื่อเริ่มต้น
+                    </div>
+                </div>
+
+                <div id="activeContent" style="display:none;">
+                    <div class="info-card" id="infoCard">
+                        <div class="info-card-label">📌 ข้อมูลตำแหน่ง</div>
+                        <div class="info-row">
+                            <div class="info-row-icon name">📝</div>
+                            <div class="info-row-content">
+                                <small>ชื่อสถานที่</small>
+                                <div class="value" id="displayName">—</div>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-row-icon lat">🔵</div>
+                            <div class="info-row-content">
+                                <small>Latitude</small>
+                                <div class="value" id="displayLat">—</div>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-row-icon lng">🟢</div>
+                            <div class="info-row-content">
+                                <small>Longitude</small>
+                                <div class="value" id="displayLng">—</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="qr-container" id="qrContainer">
+                        <div class="qr-frame">
+                            <div id="qrcode"></div>
+                            <div class="qr-label" id="qrLabel"></div>
+                            <div class="qr-label-coords" id="qrLabelCoords"></div>
+                        </div>
+                        <div class="qr-data-preview" id="qrDataPreview"></div>
+                        <div class="btn-group">
+                            <div class="btn-row">
+                                <button class="btn btn-download" id="btnDownload" onclick="downloadQR()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    ดาวน์โหลด QR
+                                </button>
+                                <button class="btn btn-primary" id="btnNewPin" onclick="clearSelection()">
+                                    ➕ จุดใหม่
+                                </button>
+                            </div>
+                            <button class="btn btn-save-open" id="btnOpenQR" onclick="openQRInNewTab()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                เปิด QR เพื่อบันทึก (กดค้างที่รูป)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="marker-list" id="markerListSection" style="display:none;">
+                    <div class="marker-list-title">
+                        ประวัติจุด <span class="count-badge" id="markerCount">0</span>
+                    </div>
+                    <div id="markerList"></div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- MODAL -->
+    <div class="modal-overlay" id="modal" style="display:none;">
+        <div class="modal-card">
+            <h3>📍 ตั้งชื่อสถานที่</h3>
+            <p>กรุณาใส่ชื่อสถานที่สำหรับตำแหน่งที่เลือก</p>
+            <div class="modal-coords" id="modalCoords"></div>
+            <div class="input-group">
+                <label for="placeNameInput">ชื่อสถานที่</label>
+                <input type="text" class="input-field" id="placeNameInput" placeholder="เช่น อาคารสำนักงาน, คลังสินค้า A ..." autocomplete="off">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button>
+                <button class="btn btn-primary" id="btnConfirm" onclick="confirmName()">✓ ยืนยัน</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- QRCode.js -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+    <script>
+        let map;
+        let currentMarker = null;
+        let pendingLatLng = null;
+        let markers = [];
+        let qrInstance = null;
+
+        function initMap() {
+            map = L.map('map', {
+                center: [14.8800, 102.0200],
+                zoom: 15,
+                zoomControl: false
+            });
+
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '&copy; <a href="https://www.esri.com/">Esri</a> — Source: Esri, Maxar, Earthstar Geographics',
+                maxZoom: 19
+            }).addTo(map);
+
+            L.control.zoom({ position: 'topright' }).addTo(map);
+            map.on('click', onMapClick);
+        }
+
+        function createIcon() {
+            return L.divIcon({
+                html: `<svg width="36" height="48" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="pinGrad" x1="0" y1="0" x2="36" y2="48" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#E65100"/><stop offset="1" stop-color="#FF6D00"/>
+                        </linearGradient>
+                        <filter id="glow"><feGaussianBlur stdDeviation="1.5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                    </defs>
+                    <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 30 18 30s18-16.5 18-30C36 8.06 27.94 0 18 0z" fill="url(#pinGrad)" filter="url(#glow)"/>
+                    <circle cx="18" cy="16" r="7" fill="white" fill-opacity="0.95"/>
+                    <circle cx="18" cy="16" r="3" fill="#E65100"/>
+                </svg>`,
+                iconSize: [36, 48],
+                iconAnchor: [18, 48],
+                popupAnchor: [0, -48],
+                className: ''
+            });
+        }
+
+        function onMapClick(e) {
+            pendingLatLng = e.latlng;
+            showModal(e.latlng);
+        }
+
+        function showModal(latlng) {
+            const modal = document.getElementById('modal');
+            document.getElementById('modalCoords').innerHTML = `
+                <span class="modal-coord-chip">Lat: ${latlng.lat.toFixed(6)}</span>
+                <span class="modal-coord-chip">Lng: ${latlng.lng.toFixed(6)}</span>
+            `;
+            document.getElementById('placeNameInput').value = '';
+            modal.style.display = 'flex';
+            setTimeout(() => document.getElementById('placeNameInput').focus(), 350);
+        }
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+            pendingLatLng = null;
+        }
+
+        function confirmName() {
+            const nameInput = document.getElementById('placeNameInput');
+            const name = nameInput.value.trim();
+            if (!name) {
+                nameInput.style.borderColor = '#E65100';
+                nameInput.style.boxShadow = '0 0 0 3px rgba(230,81,0,0.15)';
+                nameInput.focus();
+                setTimeout(() => { nameInput.style.borderColor = ''; nameInput.style.boxShadow = ''; }, 1500);
+                return;
+            }
+            const latlng = pendingLatLng;
+            closeModal();
+            processPin(name, latlng);
+        }
+
+        function processPin(name, latlng) {
+            if (!latlng) return;
+            if (currentMarker) currentMarker.setOpacity(0.5);
+
+            const marker = L.marker([latlng.lat, latlng.lng], { icon: createIcon() }).addTo(map);
+            marker.bindPopup(`
+                <div style="font-family:Kanit,sans-serif;padding:4px;">
+                    <strong style="font-size:14px;color:#E65100;">${escapeHtml(name)}</strong><br>
+                    <span style="color:#666;font-size:12px;font-family:'JetBrains Mono',monospace;">
+                        ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}
+                    </span>
+                </div>
+            `);
+
+            currentMarker = marker;
+            const entry = { name, lat: parseFloat(latlng.lat.toFixed(6)), lng: parseFloat(latlng.lng.toFixed(6)) };
+            markers.push(entry);
+
+            showActiveContent(entry);
+            generateQR(entry);
+            updateMarkerList();
+            map.flyTo(latlng, map.getZoom(), { duration: 0.8 });
+
+            const inst = document.getElementById('mapInstruction');
+            if (inst) inst.style.display = 'none';
+        }
+
+        function showActiveContent(data) {
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('activeContent').style.display = 'block';
+            document.getElementById('displayName').textContent = data.name;
+            document.getElementById('displayLat').textContent = data.lat;
+            document.getElementById('displayLng').textContent = data.lng;
+
+            const jsonStr = JSON.stringify(data, null, 2);
+            const highlighted = jsonStr
+                .replace(/"(\w+)":/g, '"<span class="json-key">$1</span>":')
+                .replace(/: "([^"]+)"/g, ': "<span class="json-value">$1</span>"')
+                .replace(/: ([\d.-]+)/g, ': <span class="json-value">$1</span>');
+            document.getElementById('qrDataPreview').innerHTML = highlighted;
+        }
+
+        function generateQR(data) {
+            const container = document.getElementById('qrcode');
+            container.innerHTML = '';
+            const jsonStr = JSON.stringify(data);
+            const encodedStr = encodeURIComponent(jsonStr);
+
+            qrInstance = new QRCode(container, {
+                text: encodedStr,
+                width: 220,
+                height: 220,
+                colorDark: '#E65100',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            document.getElementById('qrLabel').textContent = data.name;
+            document.getElementById('qrLabelCoords').textContent = `${data.lat}, ${data.lng}`;
+        }
+
+        // ===== BUILD EXPORT CANVAS (shared by download & open) =====
+        function buildExportCanvas() {
+            const canvas = document.querySelector('#qrcode canvas');
+            const latestData = markers.length > 0 ? markers[markers.length - 1] : null;
+
+            // If QRCode.js rendered as <img> instead of canvas
+            let srcCanvas = canvas;
+            if (!srcCanvas) {
+                const img = document.querySelector('#qrcode img');
+                if (!img) return null;
+                srcCanvas = document.createElement('canvas');
+                srcCanvas.width = img.naturalWidth || img.width;
+                srcCanvas.height = img.naturalHeight || img.height;
+                srcCanvas.getContext('2d').drawImage(img, 0, 0);
+            }
+
+            // High Resolution Export (3x for print)
+            const scale = 3;
+            const qrSize = srcCanvas.width * scale;
+            const padding = 60 * scale;
+            const labelHeight = 80 * scale;
+            const brandingHeight = 30 * scale;
+            const totalW = qrSize + padding * 2;
+            const totalH = qrSize + padding * 2 + labelHeight + brandingHeight;
+
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = totalW;
+            exportCanvas.height = totalH;
+            const ctx = exportCanvas.getContext('2d');
+
+            // White background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, totalW, totalH);
+
+            // Orange accent line
+            ctx.fillStyle = '#E65100';
+            ctx.fillRect(0, 0, totalW, 8 * scale);
+
+            // QR (pixel-perfect)
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(srcCanvas, padding, padding + 8 * scale, qrSize, qrSize);
+
+            // Place name
+            if (latestData) {
+                ctx.fillStyle = '#E65100';
+                ctx.font = `bold ${20 * scale}px Kanit, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText(latestData.name, totalW / 2, qrSize + padding + 8 * scale + 35 * scale);
+
+                ctx.fillStyle = '#9E9E9E';
+                ctx.font = `${12 * scale}px JetBrains Mono, monospace`;
+                ctx.fillText(`${latestData.lat}, ${latestData.lng}`, totalW / 2, qrSize + padding + 8 * scale + 55 * scale);
+            }
+
+            // Branding
+            ctx.fillStyle = '#E0E0E0';
+            ctx.font = `${9 * scale}px Kanit, sans-serif`;
+            ctx.fillText('SUT Hospital — Asset Tracking System', totalW / 2, totalH - 12 * scale);
+
+            return exportCanvas;
+        }
+
+        // ===== GET FILENAME =====
+        function getQRFileName() {
+            const latestData = markers.length > 0 ? markers[markers.length - 1] : null;
+            const placeName = latestData ? latestData.name : '';
+            return placeName ? sanitizeFilename(placeName) + '.png' : 'SUT_Hospital_QR.png';
+        }
+
+        // ===== DOWNLOAD QR (Desktop: Direct Download / iOS: New Tab) =====
+        function downloadQR() {
+            const exportCanvas = buildExportCanvas();
+            if (!exportCanvas) { showToast('⚠️ ยังไม่มี QR Code ให้ดาวน์โหลด'); return; }
+
+            const fileName = getQRFileName();
+
+            // Detect iOS Safari (doesn't support <a download> properly)
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+            if (isIOS) {
+                // iOS: open image in new tab → user long-press to save
+                exportCanvas.toBlob(function(blob) {
+                    if (!blob) { openAsDataURL(exportCanvas); return; }
+                    const blobUrl = URL.createObjectURL(blob);
+                    const newTab = window.open();
+                    if (newTab) {
+                        newTab.document.title = fileName;
+                        newTab.document.body.style.cssText = 'margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#F5F7FA;font-family:Kanit,sans-serif;';
+                        newTab.document.body.innerHTML = `
+                            <div style="text-align:center;padding:20px;">
+                                <p style="color:#E65100;font-weight:600;font-size:1.1rem;margin-bottom:16px;">📱 กดค้างที่รูปเพื่อบันทึก</p>
+                                <img src="${blobUrl}" style="max-width:90vw;max-height:70vh;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.1);" alt="${fileName}">
+                                <p style="color:#9E9E9E;font-size:0.8rem;margin-top:12px;">${fileName}</p>
+                            </div>`;
+                    } else {
+                        openAsDataURL(exportCanvas);
+                    }
+                    showToast('📱 กดค้างที่รูปเพื่อบันทึกลงมือถือ');
+                    setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 60000);
+                }, 'image/png', 1.0);
+            } else {
+                // ===== DESKTOP (Chrome/Edge/Firefox/Android): Direct Download =====
+                // Step 1: Render canvas to PNG Blob at maximum quality
+                exportCanvas.toBlob(function(blob) {
+                    if (!blob) {
+                        // Fallback: use Data URL if Blob creation fails
+                        const dataUrl = exportCanvas.toDataURL('image/png', 1.0);
+                        const fallbackLink = document.createElement('a');
+                        fallbackLink.download = fileName;
+                        fallbackLink.href = dataUrl;
+                        fallbackLink.click();
+                        showToast('✅ ดาวน์โหลด QR Code สำเร็จ!');
+                        return;
+                    }
+
+                    // Step 2: Create temporary Object URL from Blob
+                    const blobUrl = URL.createObjectURL(blob);
+
+                    // Step 3: Create invisible <a> with download attribute
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = fileName;        // ← forces filename, e.g. "ตึกศูนย์แพทย์.png"
+                    link.type = 'image/png';          // ← MIME hint for browser
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+
+                    // Step 4: Programmatic click → triggers "Save As" dialog
+                    link.click();
+
+                    showToast('✅ ดาวน์โหลด QR Code สำเร็จ!');
+
+                    // Step 5: Clean up Blob URL to free memory (after 10s)
+                    setTimeout(function() {
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(blobUrl);
+                    }, 10000);
+                }, 'image/png', 1.0);   // ← full quality PNG
+            }
+        }
+
+        // ===== OPEN QR IN NEW TAB (Safe Save for all devices) =====
+        function openQRInNewTab() {
+            const exportCanvas = buildExportCanvas();
+            if (!exportCanvas) { showToast('⚠️ ยังไม่มี QR Code'); return; }
+
+            const fileName = getQRFileName();
+            const dataUrl = exportCanvas.toDataURL('image/png', 1.0);
+
+            const newTab = window.open();
+            if (newTab) {
+                newTab.document.title = fileName;
+                newTab.document.body.style.cssText = 'margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#F5F7FA;font-family:Kanit,sans-serif;flex-direction:column;';
+                newTab.document.body.innerHTML = `
+                    <div style="text-align:center;padding:24px;max-width:500px;">
+                        <div style="background:#E65100;color:#fff;padding:14px 24px;border-radius:12px 12px 0 0;font-weight:600;font-size:1rem;">🏥 SUT Hospital — QR Code</div>
+                        <div style="background:#fff;padding:24px;border-radius:0 0 12px 12px;box-shadow:0 4px 24px rgba(0,0,0,0.1);">
+                            <img src="${dataUrl}" style="max-width:100%;border-radius:8px;" alt="${fileName}">
+                            <p style="color:#E65100;font-weight:600;font-size:1rem;margin-top:16px;">${escapeHtml(markers.length > 0 ? markers[markers.length - 1].name : '')}</p>
+                            <p style="color:#9E9E9E;font-size:0.78rem;margin-top:4px;">📱 กดค้างที่รูปภาพ → "บันทึกรูปภาพ" หรือ "Add to Photos"</p>
+                            <p style="color:#BDBDBD;font-size:0.7rem;margin-top:8px;">${fileName}</p>
+                        </div>
+                    </div>`;
+                showToast('📸 เปิดรูป QR ในแท็บใหม่แล้ว — กดค้างที่รูปเพื่อบันทึก');
+            } else {
+                showToast('⚠️ Browser บล็อก Pop-up — กรุณาอนุญาต Pop-up แล้วลองใหม่');
+            }
+        }
+
+        // ===== FALLBACK HELPERS =====
+        function openAsDataURL(targetCanvas) {
+            const url = targetCanvas.toDataURL('image/png', 1.0);
+            window.open(url, '_blank');
+        }
+
+        function fallbackDataURL(targetCanvas, name) {
+            const link = document.createElement('a');
+            link.download = name;
+            link.href = targetCanvas.toDataURL('image/png', 1.0);
+            link.type = 'image/png';
+            link.click();
+            showToast('✅ ดาวน์โหลด QR Code สำเร็จ!');
+        }
+
+        function updateMarkerList() {
+            const section = document.getElementById('markerListSection');
+            const list = document.getElementById('markerList');
+            const count = document.getElementById('markerCount');
+            section.style.display = 'block';
+            count.textContent = markers.length;
+            list.innerHTML = markers.map((m, i) => `
+                <div class="marker-item" onclick="focusMarker(${i})" title="คลิกเพื่อดู QR Code">
+                    <div class="marker-dot"></div>
+                    <div class="marker-name">${escapeHtml(m.name)}</div>
+                    <div class="marker-coords">${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}</div>
+                </div>
+            `).reverse().join('');
+        }
+
+        function focusMarker(index) {
+            const entry = markers[index];
+            map.flyTo([entry.lat, entry.lng], 17, { duration: 0.8 });
+            showActiveContent(entry);
+            generateQR(entry);
+        }
+
+        function clearSelection() {
+            document.getElementById('emptyState').style.display = 'flex';
+            document.getElementById('activeContent').style.display = 'none';
+            const inst = document.getElementById('mapInstruction');
+            if (inst) { inst.style.display = 'flex'; inst.style.animation = 'slideUp 0.6s ease-out'; }
+        }
+
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = message;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.classList.add('fade-out'); setTimeout(() => toast.remove(), 400); }, 2500);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function sanitizeFilename(name) {
+            // Strip Windows-forbidden characters: / \ : * ? " < > |
+            return name
+                .replace(/[/\\:*?"<>|]/g, '')       // remove forbidden chars
+                .replace(/[^\w\u0E00-\u0E7F\s.-]/g, '')  // keep letters, Thai, spaces, dots, hyphens
+                .replace(/\s+/g, '_')                // spaces → underscores
+                .replace(/_{2,}/g, '_')              // collapse multiple underscores
+                .replace(/^_|_$/g, '')               // trim leading/trailing underscores
+                .substring(0, 50)                    // limit length for Windows path safety
+                || 'SUT_Hospital_QR';                 // fallback if empty after cleaning
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && document.getElementById('modal').style.display === 'flex') confirmName();
+            if (e.key === 'Escape' && document.getElementById('modal').style.display === 'flex') closeModal();
+        });
+
+        initMap();
+    </script>
+</body>
+</html>
