@@ -92,28 +92,33 @@
             if (isProcessing) return; 
             isProcessing = true; 
 
-            statusBox.innerText = "⌛ กำลังบันทึกข้อมูล...";
-            statusBox.className = "";
-
-            // ส่ง MQTT พ่วงชื่อเครื่อง
-            client.publish('hospital/track', JSON.stringify({
-                data: decodedText,
-                user: STATION_ID
-            }), { qos: 1 });
-
             try {
+                // 1. ล้างค่า % ออกก่อน (เผื่อ Browser แปลงค่ามา)
                 let cleanText = decodeURIComponent(decodeURIComponent(decodedText)).trim();
                 const data = JSON.parse(cleanText);
-        
+
+                // 2. ตรวจสอบว่ามีข้อมูล lat/lng หรือไม่
+                const lat = data.lat || "0"; // ถ้าไม่มีให้เป็น 0
+                const lng = data.lng || "0"; // ถ้าไม่มีให้เป็น 0
+                const name = data.name || "ไม่ระบุชื่อจุด";
+
+                statusBox.innerText = "⌛ กำลังบันทึกข้อมูล...";
+                statusBox.className = "waiting";
+
+                // 3. ส่ง MQTT
+                client.publish('hospital/track', JSON.stringify({
+                    data: data,
+                    user: STATION_ID
+                }), { qos: 1 });
+
+                // 4. ส่งไป Google Sheets
                 const img = new Image();
-                // ส่งไป Sheets พ่วง &u=STATION_ID
-                const url = `${GOOGLE_URL}?n=${encodeURIComponent(data.name)}&la=${data.lat}&lo=${data.lng}&u=${encodeURIComponent(STATION_ID)}&t=${Date.now()}`;
-        
+                const url = `${GOOGLE_URL}?n=${encodeURIComponent(name)}&la=${lat}&lo=${lng}&u=${encodeURIComponent(STATION_ID)}&t=${Date.now()}`;
+
                 img.onload = img.onerror = function() {
-                    statusBox.innerText = "🚀 บันทึกสำเร็จ: " + data.name;
+                    statusBox.innerText = "🚀 บันทึกสำเร็จ: " + name;
                     statusBox.className = "success";
-                    
-                    // หน่วงเวลา 3 วินาทีแล้วเริ่มสแกนต่อเอง (ไม่ต้องรีโหลดหน้า)
+            
                     setTimeout(() => { 
                         isProcessing = false; 
                         statusBox.innerText = "✅ พร้อมสแกนอัตโนมัติ";
@@ -123,8 +128,12 @@
                 img.src = url;
 
             } catch (e) {
-                statusBox.innerText = "❌ รูปแบบ QR ไม่ถูกต้อง";
-                setTimeout(() => { isProcessing = false; }, 2000);
+                console.error("Format Error:", e);
+                statusBox.innerText = "❌ QR นี้ไม่มีข้อมูลพิกัด (JSON ผิดรูปแบบ)";
+                statusBox.className = "error";
+        
+                // รอ 3 วินาทีแล้วให้สแกนใหม่ได้
+                setTimeout(() => { isProcessing = false; }, 3000);
             }
         }
 
