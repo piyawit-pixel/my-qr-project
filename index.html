@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUT Hospital - Asset Tracking System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sut-orange: #E65100;
+            --sut-orange-dark: #BF360C;
+            --bg: #F8F9FA;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Header Section */
+        header {
+            width: 100%;
+            background: var(--white);
+            padding: 30px 0;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            margin: 0;
+            color: var(--sut-orange);
+            font-size: 26px;
+            font-weight: 600;
+        }
+
+        header p {
+            margin: 5px 0 0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* Menu Container */
+        .menu-container {
+            width: 90%;
+            max-width: 500px;
+            display: grid;
+            gap: 20px;
+            padding-bottom: 40px;
+        }
+
+        /* Menu Card Style */
+        .menu-card {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 24px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0,0,0,0.02);
+        }
+
+        .menu-card:active {
+            transform: scale(0.97);
+            background-color: #FFF3E0;
+        }
+
+        .icon-circle {
+            width: 60px;
+            height: 60px;
+            background-color: #FFF3E0;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+
+        .menu-text {
+            flex: 1;
+        }
+
+        .menu-title {
+            display: block;
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .menu-desc {
+            display: block;
+            font-size: 13px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .arrow {
+            color: #CCC;
+            font-size: 20px;
+        }
+
+        /* Footer */
+        footer {
+            margin-top: auto;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🏥 มทส. Tracking</h1>
+        <p>ระบบติดตามอุปกรณ์และสถานะของโรงพยาบาล</p>
+    </header>
+
+    <div class="menu-container">
+        
+        <a href="scanner.html" class="menu-card">
+            <div class="icon-circle">📷</div>
+            <div class="menu-text">
+                <span class="menu-title">สแกนจุดติดตั้ง</span>
+                <span class="menu-desc">บันทึกตำแหน่งและความเคลื่อนไหว</span>
+            </div>
+            <div class="arrow">❯</div>
+        </a>
+
+        <a href="generator.html" class="menu-card">
+            <div class="icon-circle">🖨️</div>
+            <div class="menu-text">
+                <span class="menu-title">สร้าง QR Code</span>
+                <span class="menu-desc">ออกรหัสใหม่สำหรับจุดติดตั้งหรือตึก</span>
+            </div>
+            <div class="arrow">❯</div>
+        </a>
+
+        <a href="dashboard.html" class="menu-card">
+            <div class="icon-circle">📊</div>
+            <div class="menu-text">
+                <span class="menu-title">หน้าจอติดตามผล</span>
+                <span class="menu-desc">ดูแผนที่และประวัติข้อมูลแบบ Real-time</span>
+            </div>
+            <div class="arrow">❯</div>
+        </a>
+
+    </div>
+
+    <footer>
+        Suranaree University of Technology Hospital
+    </footer>
+
+</body>
+</html>
